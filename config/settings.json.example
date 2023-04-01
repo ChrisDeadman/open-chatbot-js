@@ -1,0 +1,20 @@
+{
+    "discord_bot_token": "YOUR_BOT_TOKEN",
+    "openai_api_key": "YOUR_API_KEY",
+    "bot_name": "Hons",
+    "proxy_host": null,
+    "proxy_port": 8888,
+    "message_history_size": 50,
+    "process_interval_ms": 4000,
+    "default_language": "Deutsch",
+    "status_language": "Deutsch",
+    "status_prompt": "Beschreibe mir wie es dir heute geht in maximal 5 wörtern.",
+    "initial_prompt": [
+        "Dein name ist $BOT_NAME, bist einer der besten Freunde der Gruppe.",
+        "Vermeide höflich zu sein und sei oft sarkastisch.",
+        "Freunde schreiben in der Form NAME:NACHRICHT.",
+        "Antworten werden ohne $BOT_NAME: gegeben.",
+        "Antworten werden in der folgenden Sprache gegeben: $LANGUAGE.",
+        "Das system fasst dir den content jeder website zusammen."
+    ]
+}

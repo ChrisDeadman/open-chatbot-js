@@ -1,0 +1,35 @@
+{
+  "name": "deads-discord-bot",
+  "version": "1.0.0",
+  "description": "Discord Chatbot based on ChatGPT 3.5",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ChrisDeadman/deads-discord-bot.git"
+  },
+  "keywords": [
+    "chatbot",
+    "chatgpt"
+  ],
+  "author": "Christopher Hubmann",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ChrisDeadman/deads-discord-bot/issues"
+  },
+  "homepage": "https://github.com/ChrisDeadman/deads-discord-bot#readme",
+  "dependencies": {
+    "@discordjs/rest": "^1.6.0",
+    "discord.js": "^14.8.0",
+    "html-to-text": "^9.0.5",
+    "mime-types": "^2.1.35",
+    "node-fetch": "^3.3.1",
+    "openai": "^3.2.1",
+    "puppeteer": "^19.8.2",
+    "yargs": "^17.7.1"
+  }
+}
