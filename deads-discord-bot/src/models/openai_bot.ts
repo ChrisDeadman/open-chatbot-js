@@ -81,12 +81,21 @@ export class OpenAIBot implements BotModel {
     }
 
     private getMessages(initial_prompt: [string], conversation: ConversationData): any {
+        const now = new Date().toLocaleString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric',
+            timeZoneName: 'short',
+        });
         return [
             {
                 role: 'system',
                 content: initial_prompt
                     .join('\n')
                     .replaceAll('$BOT_NAME', this.name)
+                    .replaceAll('$NOW', now)
                     .replaceAll('$LANGUAGE', conversation.language),
             },
         ].concat(conversation.getMessages());
