@@ -1,11 +1,11 @@
 {
-    "LISTEN_PORT": 8888,
-    "DATE": "20331025",
-    "DATE_TOLERANCE": 365,
-    "GEOCITIES_FIX": true,
-    "QUICK_IMAGES": true,
-    "WAYBACK_API": true,
-    "CONTENT_TYPE_ENCODING": true,
-    "SILENT": true,
-    "SETTINGS_PAGE": false
+  "LISTEN_PORT": 8888,
+  "DATE": "20331025",
+  "DATE_TOLERANCE": 365,
+  "GEOCITIES_FIX": true,
+  "QUICK_IMAGES": true,
+  "WAYBACK_API": true,
+  "CONTENT_TYPE_ENCODING": true,
+  "SILENT": true,
+  "SETTINGS_PAGE": false
 }

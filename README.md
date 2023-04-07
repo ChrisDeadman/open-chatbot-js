@@ -13,10 +13,10 @@ docker build -t deads-discord-bot .
 
 ### Discord Mode
 ```
-docker run -v ./config/:/app/config/ --name deads-discord-bot deads-discord-bot discord
+docker run -it --rm -v ./config:/app/config/ deads-discord-bot discord
 ```
 
 ### Terminal Mode
 ```
-docker run -it -v ./config/:/app/config/ --name deads-discord-bot deads-discord-bot terminal
+docker run -it --rm -v ./config:/app/config/ deads-discord-bot terminal
 ```

@@ -5,13 +5,13 @@ import puppeteer from "puppeteer";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { settings } from "../settings.js";
+import { settings } from "../../settings.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const adblock = `${__dirname}/extensions/adblock.crx`;
 const no_cookies = `${__dirname}/extensions/nocookie.crx`;
 
-export async function readUrlContent(url) {
+export async function readUrlContent(url: string) {
     const browserArgs = [
         '--user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36',
         "--no-sandbox",
@@ -44,13 +44,13 @@ export async function readUrlContent(url) {
         "--enable-automation",
         "--headless=new",
         "--remote-debugging-port=9222",
-        `--disable-extensions-except=${adblock, no_cookies}`,
+        `--disable-extensions-except=${adblock}, ${no_cookies}`,
         `--load-extension=${adblock}`,
         `--load-extension=${no_cookies}`,
-    ]
+    ];
 
-    if (settings.proxy_host && settings.proxy_host.length > 0) {
-        browserArgs.push(`--proxy-server=http://${settings.proxy_host}:${settings.proxy_port}`)
+    if (settings.proxy_host != null && settings.proxy_host.length > 0) {
+        browserArgs.push(`--proxy-server=http://${settings.proxy_host}:${settings.proxy_port}`);
     }
 
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -64,26 +64,26 @@ export async function readUrlContent(url) {
         await browser.version();
         const page = await browser.newPage();
         page.on("dialog", async dialog => {
-            await dialog.dismiss()
+            await dialog.dismiss();
         });
         await page.goto(url, { waitUntil: "domcontentloaded" });
 
-        let html = await page.evaluate(() => {
+        const html = await page.evaluate(() => {
             return document.body.innerHTML;
         });
         const options = {
             wordwrap: 88,
             preserveNewlines: true,
-            selectors: [
-                { selector: "a.button", format: "skip" }
-            ]
+            selectors: [{ selector: "a.button", format: "skip" }],
         };
-        return convert(html, options).split(/\r?\n/).filter(line => line.trim() !== "")
+        return convert(html, options)
+            .split(/\r?\n/)
+            .filter(line => line.trim() !== "")
             .filter(line => !line.startsWith("[data:"))
             .filter(line => !line.startsWith("[") || !line.match(/\[[^\]]{100}/))
             .join("\n");
     } catch (error) {
-        return error.message;
+        return new String(error);
     } finally {
         if (browser) {
             try {

@@ -1,3 +1,4 @@
+# Use the node image, slim version
 FROM node:slim
 
 WORKDIR /app
@@ -27,6 +28,12 @@ RUN mkdir -p /app/extensions/ && \
 # Copy chrome extensions
 COPY extensions/ ./extensions/
 
+# Install redis server
+RUN apt-get install redis-server -y --no-install-recommends && \
+    rm -rf /usr/include /usr/share/man && \
+    rm -rf /var/cache/apk/* && \
+    rm -rf /tmp/*
+
 # Prepare Wayback Proxy
 COPY WaybackProxy/ ./WaybackProxy
 RUN rm /app/WaybackProxy/config.json && \
@@ -44,6 +51,9 @@ RUN npm install && \
     rm -rf /usr/include /usr/share/man && \
     rm -rf /var/cache/apk/* /var/lib/apt/lists/* && \
     rm -rf /tmp/*
+
+# Build TypeScript to JavaScript
+RUN npx tsc
 
 # Copy Startup script
 COPY startup.sh ./
