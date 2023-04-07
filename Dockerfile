@@ -14,22 +14,13 @@ RUN apt-get update && apt-get install gnupg wget -y && \
     rm -rf /var/cache/apk/*&& \
     rm -rf /tmp/*
 
-# Install utils
-RUN apt-get install less nano curl nmon python3 -y --no-install-recommends && \
-    rm -rf /usr/include /usr/share/man && \
-    rm -rf /var/cache/apk/* && \
-    rm -rf /tmp/*
-
 # Download Chrome extensions
 RUN mkdir -p /app/extensions/ && \
     wget -O app/extensions/adblock.crx https://clients2.google.com/service/update2/crx?response=redirect&prodversion=111.0.5563.146&acceptformat=crx3,crx4&x=id%3Dcfhdojbkjhnklbpkdaibdccddilifddb%26uc && \
     wget -O app/extensions/nocookie.crx https://clients2.google.com/service/update2/crx?response=redirect&prodversion=111.0.5563.146&acceptformat=crx3,crx4&x=id%3Dfihnjjcciajhdojfnbdddfaoknhalnja%26uc
 
-# Copy chrome extensions
-COPY extensions/ ./extensions/
-
-# Install redis server
-RUN apt-get install redis-server -y --no-install-recommends && \
+# Install python and redis server
+RUN apt-get install python3 redis-server -y --no-install-recommends && \
     rm -rf /usr/include /usr/share/man && \
     rm -rf /var/cache/apk/* && \
     rm -rf /tmp/*
@@ -39,18 +30,21 @@ COPY WaybackProxy/ ./WaybackProxy
 RUN rm /app/WaybackProxy/config.json && \
     ln -s /app/config/wayback_config.json /app/WaybackProxy/config.json
 
-# Copy Discord bot
-COPY deads-discord-bot/ ./
-
 # We don't need the standalone Chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
 ENV PUPPETEER_EXECUTABLE_PATH "/usr/bin/google-chrome"
+
+# Copy package.json
+COPY deads-discord-bot/package.json ./
 
 # Install npm packages
 RUN npm install && \
     rm -rf /usr/include /usr/share/man && \
     rm -rf /var/cache/apk/* /var/lib/apt/lists/* && \
     rm -rf /tmp/*
+
+# Copy Discord bot
+COPY deads-discord-bot/ ./
 
 # Build TypeScript to JavaScript
 RUN npx tsc

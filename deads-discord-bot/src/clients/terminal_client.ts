@@ -51,24 +51,22 @@ export class TerminalClient implements BotClient {
                 }
                 console.log(`${this.botModel.name}: ${response}`);
 
-                // Let the bot use the API if it wants to but limit cycles
-                for (let cycle = 0; cycle < settings.max_api_cycles; cycle += 1) {
-                    const req_response = this.botApiHandler.handleAPIRequest(
-                        this.conversation,
-                        response
-                    );
-                    if (req_response.length <= 0) {
-                        return;
-                    }
-                    console.log(`System: ${req_response.replace('\n', ' ')}`);
+                // Let the bot use the API if it wants
+                this.botApiHandler.handleAPIRequest(response).then(async req_response => {
+                    if (req_response.length > 0) {
+                        // Add API response to system messages
+                        this.conversation.addMessage({ role: 'system', content: req_response });
 
-                    // Ask bot again with API answer
-                    response = await this.botModel.ask(settings.initial_prompt, this.conversation);
-                    if (response.length <= 0) {
-                        return;
+                        // Reply to bot again with API answer
+                        response = await this.botModel.ask(
+                            settings.initial_prompt,
+                            this.conversation
+                        );
+                        if (response.length > 0) {
+                            console.log(`${this.botModel.name}: ${response}`);
+                        }
                     }
-                    console.log(`${this.botModel.name}: ${response}`);
-                }
+                });
             } catch (error) {
                 console.error('Channel processing error:', error);
             }

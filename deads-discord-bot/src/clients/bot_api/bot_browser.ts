@@ -1,29 +1,24 @@
 import { convert } from 'html-to-text';
-import { Browser } from 'puppeteer';
+import { Browser, Page } from 'puppeteer';
 
 import { settings } from '../../settings.js';
 
 import { BotModel } from '../../models/bot_model.js';
 import { ConversationData } from '../../models/converstation_data.js';
 
-import { Queue, Worker } from 'bullmq';
-
-const STATUS_LOADING = 'LOADING';
-const STATUS_MORE_DATA = 'MORE DATA LOADING';
-const STATUS_COMPLETE = 'LOADING COMPLETE';
-const STATUS_ERROR = 'ERROR';
-
 class PageData {
     url: string;
     content: Array<string> = [];
     lastAccessed: number;
-    status: string;
+    reload: boolean;
+    done: boolean;
     summary: string;
 
     constructor(url: string) {
         this.url = url;
         this.lastAccessed = Date.now();
-        this.status = STATUS_LOADING;
+        this.reload = true;
+        this.done = false;
         this.summary = '';
     }
 }
@@ -32,36 +27,13 @@ export class BotBrowser {
     private botModel: BotModel;
     private browser: Browser;
     private pages: { [key: string]: { [key: string]: PageData } } = {};
-    private processQueue = new Queue('processPages');
 
     constructor(botModel: BotModel, browser: Browser) {
         this.botModel = botModel;
         this.browser = browser;
-        this.createWorker();
-        this.schedulePeriodicJobs();
     }
 
-    private createWorker() {
-        return new Worker(this.processQueue.name, this.processPages.bind(this));
-    }
-
-    private async schedulePeriodicJobs() {
-        // Remove all previously scheduled jobs
-        await this.processQueue.obliterate({ force: true });
-
-        // Add new repeatable job
-        await this.processQueue.add(
-            'processPages',
-            {},
-            {
-                repeat: {
-                    every: 5000,
-                },
-            }
-        );
-    }
-
-    getPageData(language: string, url: string) {
+    async getPageData(language: string, url: string) {
         if (!(language in this.pages)) {
             this.pages[language] = {};
         }
@@ -71,27 +43,13 @@ export class BotBrowser {
         }
         const page = pageDict[url];
         page.lastAccessed = Date.now();
-        return page;
-    }
-
-    private async processPages() {
-        const now = Date.now();
-        for (const language in this.pages) {
-            for (const url in this.pages[language]) {
-                const pageData = this.pages[language][url];
-                if (
-                    pageData.status === STATUS_COMPLETE ||
-                    pageData.status.startsWith(STATUS_ERROR)
-                ) {
-                    // Remove pages older than 30 minutes
-                    if (now - pageData.lastAccessed > 30 * 60 * 1000) {
-                        delete this.pages[language];
-                    }
-                } else {
-                    await this.readPage(pageData);
-                }
-            }
+        // load pages that are flagged for loading
+        if (page.reload) {
+            const readPagePromise = this.readPage(page);
+            this.prunePages(pageDict);
+            await readPagePromise;
         }
+        return page;
     }
 
     private async readPage(pageData: PageData) {
@@ -102,28 +60,34 @@ export class BotBrowser {
         const url = settings.proxy_host != null ? `http://${proto_url}` : `https://${proto_url}`;
 
         try {
-            // Perform initial loading of the page
-            if (pageData.status === STATUS_LOADING) {
+            // Loading the page and get the content
+            if (pageData.reload) {
                 let html = '';
 
                 // Initialize a new page
-                const page = await this.browser.newPage();
+                let page: Page | undefined;
                 try {
+                    page = await this.browser.newPage();
                     // Ensure to dismiss all dialogs
                     page.on('dialog', async dialog => {
                         await dialog.dismiss();
                     });
 
                     // Load page contant
-                    await page.goto(url, { waitUntil: 'domcontentloaded' });
+                    await page.goto(url, {
+                        timeout: settings.www_timeout,
+                        waitUntil: 'domcontentloaded',
+                    });
                     html = await page.evaluate(() => {
                         return document.body.innerHTML;
                     });
                 } catch (error) {
-                    pageData.status = `${STATUS_ERROR}: ${error}`;
+                    pageData.summary = String(error);
+                    pageData.reload = true;
+                    pageData.done = true;
                     return;
                 } finally {
-                    page.close();
+                    page?.close();
                 }
 
                 // Convert and filter content
@@ -146,26 +110,43 @@ export class BotBrowser {
 
                 // Initialize summary
                 pageData.summary = 'Summary:\n\nLinks:';
+                pageData.reload = false;
             }
 
-            // No content -> we are finished
-            if (pageData.content.length <= 0) {
-                pageData.status = STATUS_COMPLETE;
-                return;
+            // Ask the bot model to update the summary until all content is processed
+            while (pageData.content.length > 0) {
+                const conversation = new ConversationData(settings.default_language, 1);
+                conversation.addMessage({
+                    role: 'system',
+                    content: `${pageData.summary}\n\nContent:\n${pageData.content.shift()}`,
+                });
+                pageData.summary = await this.botModel.ask(
+                    settings.bot_browser_prompt,
+                    conversation
+                );
             }
-
-            // Ask the bot model to update the summary
-            const conversation = new ConversationData(settings.default_language, 1);
-            conversation.addMessage({
-                role: 'assistant',
-                content: `${pageData.summary}\n\nContent:\n${pageData.content.shift()}`,
-            });
-            pageData.summary = await this.botModel.ask(settings.bot_browser_prompt, conversation);
 
             // Update status
-            pageData.status = pageData.content.length > 0 ? STATUS_MORE_DATA : STATUS_COMPLETE;
+            pageData.done = true;
         } catch (error) {
-            pageData.status = `${STATUS_ERROR}: ${error}`;
+            pageData.summary = String(error);
+            pageData.reload = false;
+            pageData.done = true;
+        }
+    }
+
+    /**
+     * Remove pages older than 30 minutes
+     */
+    private prunePages(pageDict: { [key: string]: PageData }) {
+        const now = Date.now();
+        for (const url in pageDict) {
+            const pageData = pageDict[url];
+            if (pageData.done) {
+                if (now - pageData.lastAccessed > 30 * 60 * 1000) {
+                    delete pageDict[url];
+                }
+            }
         }
     }
 }

@@ -1,5 +1,4 @@
 import { BotModel } from '../../models/bot_model.js';
-import { ConversationData } from '../../models/converstation_data.js';
 import { settings } from '../../settings.js';
 import { BotBrowser } from './bot_browser.js';
 import { startBrowser } from './start_browser.js';
@@ -11,7 +10,7 @@ export class BotApiHandler {
         this.botBrowser = botBrowser;
     }
 
-    handleAPIRequest(conversation: ConversationData, request: string): string {
+    async handleAPIRequest(request: string): Promise<string> {
         const api_regex = /\[API:([^:]+):([^>]+)\]/g;
 
         const matches = request.matchAll(api_regex);
@@ -19,30 +18,29 @@ export class BotApiHandler {
             const fn = match[1].toLowerCase();
             const arg = match[2];
 
-            let userResponse = `API REQUEST: ${match[0]}\n`;
-            let systemResponse = userResponse;
+            const apiRequest = `API REQUEST: ${match[0]}`;
+            console.debug(`${apiRequest}`);
+
+            let apiResponse = '';
             switch (fn) {
                 case 'browser': {
-                    const pageData = this.botBrowser.getPageData(settings.default_language, arg);
-                    systemResponse += `STATUS: ${pageData.status}`;
-                    userResponse = systemResponse;
-                    if (pageData.summary.length > 0) {
-                        systemResponse += `\nCONTENT:\n${pageData.summary}`;
-                    }
+                    const pageData = await this.botBrowser.getPageData(
+                        settings.default_language,
+                        arg
+                    );
+                    apiResponse = pageData.summary;
                     break;
                 }
                 default: {
-                    systemResponse += 'STATUS: API FUNCTION NOT FOUND';
-                    userResponse = systemResponse;
+                    apiResponse = 'API FUNCTION NOT FOUND';
                     break;
                 }
             }
 
-            if (systemResponse.length > 0) {
-                conversation.addMessage({ role: 'system', content: systemResponse });
-            }
-
-            return userResponse;
+            console.debug(
+                `API RESPONSE: ${this.truncateString(apiResponse, 50).replace('\n', ' ')}`
+            );
+            return `${apiRequest}\n${apiResponse}`;
         }
 
         return '';
@@ -52,5 +50,13 @@ export class BotApiHandler {
         const browser = await startBrowser();
         const botBrowser = new BotBrowser(botModel, browser);
         return new BotApiHandler(botBrowser);
+    }
+
+    private truncateString(str: string, maxLength: number) {
+        if (str.length > maxLength) {
+            return str.slice(0, maxLength) + '...';
+        } else {
+            return str;
+        }
     }
 }
