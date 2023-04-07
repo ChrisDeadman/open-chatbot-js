@@ -6,16 +6,21 @@ import { loadSettings, settings } from './settings.js';
 import { BotModel } from './models/bot_model.js';
 import { OpenAIBot } from './models/openai_bot.js';
 
+import { BotApiHandler } from './clients/bot_api/bot_api_handler.js';
 import { BotClient } from './clients/bot_client.js';
 import { DiscordClient } from './clients/discord_client.js';
 import { TerminalClient } from './clients/terminal_client.js';
 
-function createClient(command: string, botModel: BotModel): BotClient {
+function createClient(
+    command: string,
+    botModel: BotModel,
+    botApiHandler: BotApiHandler
+): BotClient {
     switch (command) {
         case 'discord':
-            return new DiscordClient(botModel);
+            return new DiscordClient(botModel, botApiHandler);
         default:
-            return new TerminalClient(botModel);
+            return new TerminalClient(botModel, botApiHandler);
     }
 }
 
@@ -32,14 +37,13 @@ console.log('Loading settings...');
 await loadSettings('config/settings.json');
 
 // Create the Bot model
-const botModel: BotModel = new OpenAIBot(
-    settings.bot_name,
-    settings.initial_prompt,
-    settings.openai_api_key
-);
+const botModel: BotModel = new OpenAIBot(settings.bot_name, settings.openai_api_key);
+
+// Create the Bot API Handler
+const botApiHandler = await BotApiHandler.initApi(botModel);
 
 // Create the Bot client
-const botClient: BotClient = createClient(command, botModel);
+const botClient: BotClient = createClient(command, botModel, botApiHandler);
 
 // Normal exit
 process.on('beforeExit', async () => {

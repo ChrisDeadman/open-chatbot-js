@@ -1,63 +1,90 @@
+import axios from 'axios';
 import { Job, Queue, QueueEvents, Worker } from 'bullmq';
 import { Configuration, OpenAIApi } from 'openai';
 import { BotModel } from './bot_model.js';
 import { ConversationData } from './converstation_data.js';
-
 type JobData = { messages: any[]; language: string };
 type JobResult = string;
 
 export class OpenAIBot implements BotModel {
     name: string;
-    private initial_prompt: string[];
     private openai: OpenAIApi;
+    private model: string;
     private chatQueue = new Queue<JobData, JobResult>('processChatJob');
     private chatQueueEvents: QueueEvents;
+    private worker: Worker;
 
-    constructor(name: string, initial_prompt: string[], openai_api_key: string) {
+    constructor(
+        name: string,
+        openai_api_key: string,
+        model = 'gpt-3.5-turbo-0301' /* gpt-3.5-turbo */
+    ) {
         this.name = name;
-        this.initial_prompt = initial_prompt;
         this.openai = new OpenAIApi(new Configuration({ apiKey: openai_api_key }));
+        this.model = model;
         this.chatQueueEvents = new QueueEvents(this.chatQueue.name);
-        new Worker(this.chatQueue.name, this.processChatJob.bind(this), {
+        this.chatQueue.obliterate({ force: true }); // remove old jobs
+        this.worker = this.createWorker();
+    }
+
+    private createWorker(): Worker {
+        return new Worker(this.chatQueue.name, this.processChatJob.bind(this), {
             limiter: {
                 max: 1,
-                duration: 1000,
+                duration: 2000,
             },
         });
     }
 
-    async ask(conversation: ConversationData): Promise<string> {
+    async ask(initial_prompt: [string], conversation: ConversationData): Promise<string> {
         const job = await this.chatQueue.add('ask', {
-            messages: this.getMessages(conversation),
+            messages: this.getMessages(initial_prompt, conversation),
             language: conversation.language,
         });
-        const result = await job.waitUntilFinished(this.chatQueueEvents);
+        const response = await job.waitUntilFinished(this.chatQueueEvents);
         // Strip the botname in case it responds with it
         const prefix = `${this.name}: `;
-        if (result.startsWith(prefix)) {
-            return result.substring(prefix.length);
+        if (response.startsWith(prefix)) {
+            return response.substring(prefix.length);
         }
-        return result;
+        // Store bot response
+        if (response.length > 0) {
+            conversation.addMessage({ role: 'assistant', content: response });
+        }
+        return response;
     }
 
     private async processChatJob(job: Job<JobData>): Promise<string> {
         try {
+            console.debug(`OpenAI: sending ${job.data.messages.length} messages...`);
+            const startTime = Date.now();
             const completion = await this.openai.createChatCompletion({
-                model: 'gpt-3.5-turbo',
+                model: this.model,
                 messages: job.data.messages,
             });
+            const endTime = Date.now();
+            const elapsedMs = endTime - startTime;
+            console.debug(`OpenAI: response received after ${elapsedMs}ms`);
             const message = completion.data.choices[0].message;
-            return message ? message.content : '<EMPTY>';
+            return message ? message.content : '[EMPTY]';
         } catch (error) {
+            console.error(`OpenAI: ${error}`);
+            if (axios.isAxiosError(error)) {
+                // Obey OpenAI rate limit
+                if (error.response?.status == 429) {
+                    await this.worker.rateLimit(5000);
+                    throw Worker.RateLimitError();
+                }
+            }
             return String(error);
         }
     }
 
-    private getMessages(conversation: ConversationData): any {
+    private getMessages(initial_prompt: [string], conversation: ConversationData): any {
         return [
             {
                 role: 'system',
-                content: this.initial_prompt
+                content: initial_prompt
                     .join('\n')
                     .replaceAll('$BOT_NAME', this.name)
                     .replaceAll('$LANGUAGE', conversation.language),

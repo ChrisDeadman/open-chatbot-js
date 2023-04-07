@@ -14,17 +14,20 @@ import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v9';
 import { BotModel } from '../models/bot_model.js';
 import { ConversationData } from '../models/converstation_data.js';
+import { BotApiHandler } from './bot_api/bot_api_handler.js';
 import { BotClient } from './bot_client.js';
 
 export class DiscordClient implements BotClient {
     private client: Client;
     private botModel: BotModel;
+    private botApiHandler: BotApiHandler;
     private commands = new Collection<string, any>();
     private commandArray = new Array<any>();
     private conversation: { [key: Snowflake]: ConversationData } = {};
 
-    constructor(botModel: BotModel) {
+    constructor(botModel: BotModel, botApiHandler: BotApiHandler) {
         this.botModel = botModel;
+        this.botApiHandler = botApiHandler;
         this.client = new Client({
             intents: [
                 GatewayIntentBits.Guilds,
@@ -135,7 +138,7 @@ export class DiscordClient implements BotClient {
                 role: 'system',
                 content: settings.status_prompt,
             });
-            const statusMessage = await this.botModel.ask(conversation);
+            const statusMessage = await this.botModel.ask(settings.initial_prompt, conversation);
             console.log(`Status message: ${statusMessage}`);
 
             console.log('Setting bot status...');
@@ -155,15 +158,17 @@ export class DiscordClient implements BotClient {
                 return;
             }
 
-            // Add to channel messages
+            // Get conversation for this channel
             const conversation = this.getConversation(message.channel.id);
+
+            // Add message to the channel
             conversation.addMessage({
                 role: 'user',
                 content: `${message.author.username}: ${message.content}`,
             });
             console.log(`[${message.channelId}] ${message.author.username}: ${message.content}`);
 
-            // Handle attachments
+            // Add attachment text to the channel messages
             if (message.attachments.size > 0) {
                 for (const attachment of message.attachments.values()) {
                     // Only process text files
@@ -178,10 +183,10 @@ export class DiscordClient implements BotClient {
                             // Add the attachment text to the channel messages
                             conversation.addMessage({
                                 role: 'user',
-                                content: `${message.author.username}: file <${attachment.name}>:\n${textContent}`,
+                                content: `${message.author.username}: file [${attachment.name}]:\n${textContent}`,
                             });
                             console.log(
-                                `[${message.channelId}] ${message.author.username}: file <${attachment.name}>`
+                                `[${message.channelId}] ${message.author.username}: file [${attachment.name}]`
                             );
                         } catch (error) {
                             console.error(`Error reading attachment ${attachment.name}:`, error);
@@ -248,8 +253,18 @@ export class DiscordClient implements BotClient {
         }, settings.process_interval_ms);
     }
 
+    private async sendToChannel(channel: any, message: string, chunkSize = 1000) {
+        const numChunks = Math.ceil(message.length / chunkSize);
+
+        console.log(`[${channel.id}] ${this.botModel.name}: ${message}`);
+
+        for (let chunk = 0, idx = 0; chunk < numChunks; ++chunk, idx += chunkSize) {
+            await channel.send(message.substring(idx, idx + chunkSize));
+        }
+    }
+
     private async processChannel(channel: any) {
-        const chunkSize = 1000;
+        const typingTimeoutMs = 10000;
         const conversation = this.getConversation(channel.id);
 
         // No messages, nothing to do
@@ -257,18 +272,37 @@ export class DiscordClient implements BotClient {
             return;
         }
 
-        channel.sendTyping();
-
-        const response = await this.botModel.ask(conversation);
-        console.log(`${this.botModel.name}: ${response}`);
-
-        if (response.length > 0) {
-            conversation.addMessage({ role: 'assistant', content: response });
-            const numChunks = Math.ceil(response.length / chunkSize);
-
-            for (let chunk = 0, idx = 0; chunk < numChunks; ++chunk, idx += chunkSize) {
-                await channel.send(response.substring(idx, idx + chunkSize));
+        // Send typing every 10 seconds as long as bot is working
+        function sendTyping() {
+            channel.sendTyping();
+            typingTimeout = setTimeout(sendTyping, typingTimeoutMs);
+        }
+        let typingTimeout = setTimeout(sendTyping, typingTimeoutMs);
+        try {
+            // Ask bot
+            let response = await this.botModel.ask(settings.initial_prompt, conversation);
+            if (response.length <= 0) {
+                return;
             }
+            await this.sendToChannel(channel, response);
+
+            // Let the bot use the API if it wants to but limit cycles
+            for (let cycle = 0; cycle < settings.max_api_cycles; cycle += 1) {
+                const req_response = this.botApiHandler.handleAPIRequest(conversation, response);
+                if (req_response.length <= 0) {
+                    return;
+                }
+                console.log(`System: ${req_response.replace('\n', ' ')}`);
+
+                // Ask bot again with API answer
+                response = await this.botModel.ask(settings.initial_prompt, conversation);
+                if (response.length <= 0) {
+                    return;
+                }
+                await this.sendToChannel(channel, response);
+            }
+        } finally {
+            clearTimeout(typingTimeout);
         }
     }
 }
