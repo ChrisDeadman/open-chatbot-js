@@ -1,5 +1,5 @@
-import { BotModel } from '../../models/bot_model.js';
-import { settings } from '../../settings.js';
+import { BotModel } from '../models/bot_model.js';
+import { settings } from '../settings.js';
 import { BotBrowser } from './bot_browser.js';
 import { startBrowser } from './start_browser.js';
 

@@ -6,7 +6,7 @@ import { loadSettings, settings } from './settings.js';
 import { BotModel } from './models/bot_model.js';
 import { OpenAIBot } from './models/openai_bot.js';
 
-import { BotApiHandler } from './clients/bot_api/bot_api_handler.js';
+import { BotApiHandler } from './bot_api/bot_api_handler.js';
 import { BotClient } from './clients/bot_client.js';
 import { DiscordClient } from './clients/discord_client.js';
 import { TerminalClient } from './clients/terminal_client.js';

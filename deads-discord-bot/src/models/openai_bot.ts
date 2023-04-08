@@ -44,10 +44,6 @@ export class OpenAIBot implements BotModel {
         if (response.startsWith(prefix)) {
             return response.substring(prefix.length);
         }
-        // Store bot response
-        if (response.length > 0) {
-            conversation.addMessage({ role: 'assistant', content: response });
-        }
         return response;
     }
 

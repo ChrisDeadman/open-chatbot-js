@@ -1,10 +1,10 @@
 import { convert } from 'html-to-text';
 import { Browser, Page } from 'puppeteer';
 
-import { settings } from '../../settings.js';
+import { settings } from '../settings.js';
 
-import { BotModel } from '../../models/bot_model.js';
-import { ConversationData } from '../../models/converstation_data.js';
+import { BotModel } from '../models/bot_model.js';
+import { ConversationData } from '../models/converstation_data.js';
 
 class PageData {
     url: string;

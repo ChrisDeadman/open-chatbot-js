@@ -22,6 +22,10 @@ export class ConversationData {
         return this.history.length <= 0 && this.pinnedHistory.length <= 0;
     }
 
+    isFull() {
+        return this.history.length >= this.history_size;
+    }
+
     getMessages() {
         const convHistory =
             this.nextMessageIndex === this.lastMessageIndex

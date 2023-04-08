@@ -12,10 +12,10 @@ import { fileURLToPath } from 'node:url';
 
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v9';
+import { BotApiHandler } from '../bot_api/bot_api_handler.js';
 import { BotModel } from '../models/bot_model.js';
 import { ConversationData } from '../models/converstation_data.js';
-import { BotApiHandler } from './bot_api/bot_api_handler.js';
-import { BotClient } from './bot_client.js';
+import { BotClient, handleBot } from './bot_client.js';
 
 export class DiscordClient implements BotClient {
     private client: Client;
@@ -266,7 +266,6 @@ export class DiscordClient implements BotClient {
     private async processChannel(channel: any) {
         const typingTimeoutMs = 10000;
         const conversation = this.getConversation(channel.id);
-        let response = '';
 
         // No messages, nothing to do
         if (conversation.isEmpty()) {
@@ -279,34 +278,17 @@ export class DiscordClient implements BotClient {
             channel.sendTyping();
             typingTimeout = setTimeout(sendTyping, typingTimeoutMs);
         }
-        sendTyping();
-        try {
-            // Ask bot
-            response = await this.botModel.ask(settings.initial_prompt, conversation);
-            if (response.length > 0) {
+
+        // Hand over control to bot handler - he knows best
+        handleBot(
+            this.botModel,
+            this.botApiHandler,
+            conversation,
+            async response => {
                 await this.sendToChannel(channel, response);
-            }
-        } finally {
-            clearTimeout(typingTimeout);
-        }
-
-        // Let the bot use the API if it wants
-        this.botApiHandler.handleAPIRequest(response).then(async req_response => {
-            if (req_response.length > 0) {
-                // Add API response to system messages
-                conversation.addMessage({ role: 'system', content: req_response });
-
-                sendTyping();
-                try {
-                    // Reply to bot again with API answer
-                    response = await this.botModel.ask(settings.initial_prompt, conversation);
-                    if (response.length > 0) {
-                        await this.sendToChannel(channel, response);
-                    }
-                } finally {
-                    clearTimeout(typingTimeout);
-                }
-            }
-        });
+            },
+            () => sendTyping(),
+            () => clearTimeout(typingTimeout)
+        );
     }
 }

@@ -3,7 +3,7 @@ import puppeteer from 'puppeteer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { settings } from '../../settings.js';
+import { settings } from '../settings.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

@@ -10,7 +10,7 @@
   "www_timeout": 60000,
   "default_language": "German",
   "status_language": "German",
-  "status_prompt": "Beschreibe wie's dir heute geht in maximal 5 wörtern.",
+  "status_prompt": "Beschreibe uns in 5 worten wie heute dein Befinden ist.",
   "initial_prompt": [
     "Current Time: $NOW.",
     "You are roleplaying as a human named $BOT_NAME, the best friend within your group.",
@@ -22,6 +22,12 @@
     "To perform API calls, reply using the format '[API:$function:$parameter]'.",
     "After the API function is completed, the system will provide a response.",
     "If a friend requests internet access, use [API:Browser:$url] and replace $url with the appropriate URL."
+  ],
+  "compress_history_prompt": [
+    "You are not an AI Assistant; instead, you are a chat history summarizer and information gathering machine.",
+    "Your input consists of the previous summary and the new chat history.",
+    "Your primary task is to create a summary in $LANGUAGE based on the previous summary and the new chat history.",
+    "An AI Assistant will utilize your summary so it can remember what happened until now."
   ],
   "bot_browser_prompt": [
     "You are not an AI Assistant; instead, you are a content summarizer and information gathering machine.",
