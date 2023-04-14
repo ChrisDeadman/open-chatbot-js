@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
         "target": "es2021",
-        "types": ["node", "jest"],
+        "types": ["node"],
         "module": "es2022",
         "lib": ["es2021"],
         "outDir": "./dist",
@@ -18,5 +18,5 @@
         "allowSyntheticDefaultImports": true,
         "forceConsistentCasingInFileNames": true
     },
-    "exclude": ["dist", "node_modules"]
+    "exclude": ["dist", "node_modules", "test", "jest.config.ts"]
 }

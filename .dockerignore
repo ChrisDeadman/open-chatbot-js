@@ -1,4 +1,4 @@
-.git
-__pycache__
-dist
-node_modules
+**/.git
+**/dist
+**/node_modules
+**/package-lock.json

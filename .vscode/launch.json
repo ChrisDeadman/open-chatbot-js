@@ -11,9 +11,13 @@
       "runtimeExecutable": "node",
       "args": [
         "--enable-source-maps",
-        "${workspaceFolder}/deads-discord-bot/dist/index.js",
+        "${workspaceFolder}/deads-discord-bot/dist/src/index.js",
         "terminal"
       ],
+      "env": {
+        "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
+        "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/google-chrome-stable"
+      },
       "resolveSourceMapLocations": [
         "${workspaceFolder}/**",
         "!**/node_modules/**"
@@ -38,9 +42,13 @@
       "runtimeExecutable": "node",
       "args": [
         "--enable-source-maps",
-        "${workspaceFolder}/deads-discord-bot/dist/index.js",
+        "${workspaceFolder}/deads-discord-bot/dist/src/index.js",
         "discord"
       ],
+      "env": {
+        "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
+        "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/google-chrome-stable"
+      },
       "resolveSourceMapLocations": [
         "${workspaceFolder}/**",
         "!**/node_modules/**"
