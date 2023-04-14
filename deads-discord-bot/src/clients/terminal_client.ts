@@ -2,21 +2,18 @@ import { BotModel } from '../models/bot_model.js';
 
 import readline from 'readline';
 
-import { settings } from '../settings.js';
-
 import { BotApiHandler } from '../bot_api/bot_api_handler.js';
-import { ConversationData } from '../models/converstation_data.js';
-import { BotClient, handleBot } from './bot_client.js';
+import { MemoryProvider } from '../memory/memory_provider.js';
+import { ConversationData } from '../models/conversation_data.js';
+import { settings } from '../settings.js';
+import { BotClient } from './bot_client.js';
 
-export class TerminalClient implements BotClient {
-    private botModel: BotModel;
-    private botApiHandler: BotApiHandler;
-    private conversation: ConversationData;
+export class TerminalClient extends BotClient {
     private rlInterface: any;
+    protected conversation: ConversationData;
 
-    constructor(botModel: BotModel, botApiHandler: BotApiHandler) {
-        this.botModel = botModel;
-        this.botApiHandler = botApiHandler;
+    constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: BotApiHandler) {
+        super(botModel, memory, botApiHandler);
         this.conversation = new ConversationData(
             settings.default_language,
             settings.message_history_size
@@ -26,7 +23,6 @@ export class TerminalClient implements BotClient {
     async startup() {
         this.rlInterface = readline.createInterface({
             input: process.stdin,
-            //output: process.stdout,
             terminal: false,
         });
 
@@ -44,12 +40,14 @@ export class TerminalClient implements BotClient {
         this.rlInterface.on('line', async (line: string) => {
             try {
                 // Add new message to conversation
-                this.conversation.addMessage({ role: 'user', content: `Konsolero: ${line}` });
+                this.conversation.addMessage({
+                    role: 'user',
+                    sender: 'Developer',
+                    content: `${line}`,
+                });
 
                 // Hand over control to bot handler - he knows best
-                handleBot(
-                    this.botModel,
-                    this.botApiHandler,
+                await this.chat(
                     this.conversation,
                     async response => {
                         console.log(`${this.botModel.name}: ${response}`);

@@ -13,21 +13,19 @@ import { fileURLToPath } from 'node:url';
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v9';
 import { BotApiHandler } from '../bot_api/bot_api_handler.js';
+import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
-import { ConversationData } from '../models/converstation_data.js';
-import { BotClient, handleBot } from './bot_client.js';
+import { ConversationData } from '../models/conversation_data.js';
+import { BotClient } from './bot_client.js';
 
-export class DiscordClient implements BotClient {
+export class DiscordClient extends BotClient {
     private client: Client;
-    private botModel: BotModel;
-    private botApiHandler: BotApiHandler;
     private commands = new Collection<string, any>();
     private commandArray = new Array<any>();
     private conversation: { [key: Snowflake]: ConversationData } = {};
 
-    constructor(botModel: BotModel, botApiHandler: BotApiHandler) {
-        this.botModel = botModel;
-        this.botApiHandler = botApiHandler;
+    constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: BotApiHandler) {
+        super(botModel, memory, botApiHandler);
         this.client = new Client({
             intents: [
                 GatewayIntentBits.Guilds,
@@ -126,6 +124,9 @@ export class DiscordClient implements BotClient {
     }
 
     private initEventListeners() {
+        //
+        // CLIENT READY
+        //
         this.client.on(Events.ClientReady, async () => {
             console.log(`Logged in as ${this.client.user?.tag}!`);
 
@@ -136,25 +137,38 @@ export class DiscordClient implements BotClient {
             const conversation = new ConversationData(settings.default_language, 1);
             conversation.addMessage({
                 role: 'system',
+                sender: 'system',
                 content: settings.status_prompt,
             });
-            const statusMessage = await this.botModel.ask(settings.initial_prompt, conversation);
-            console.log(`Status message: ${statusMessage}`);
+            const messages = await this.getMessages(conversation);
+            const response = await this.botModel.chat(messages);
+            const responseData = this.parseResponse(response);
+            console.log(`Status message: ${responseData.message}`);
 
             console.log('Setting bot status...');
             this.client.user?.setPresence({ status: 'online' });
-            this.client.user?.setActivity(statusMessage, { type: 3 });
+            this.client.user?.setActivity(responseData.message, { type: 3 });
 
             console.log('Bot startup complete.');
         });
-
+        //
+        // ERROR
+        //
         this.client.on(Events.Error, error => {
-            console.error('Discord client error:', error);
+            console.error(error);
         });
-
+        //
+        // MESSAGE
+        //
         this.client.on(Events.MessageCreate, async message => {
             // Ignore messages from other bots
-            if (message.author.bot) {
+            // TODO: Disabled for testing
+            /*if (message.author.bot) {
+                return;
+            }*/
+
+            // Do not respond to self
+            if (message.author.id == this.client.user?.id) {
                 return;
             }
 
@@ -164,7 +178,8 @@ export class DiscordClient implements BotClient {
             // Add message to the channel
             conversation.addMessage({
                 role: 'user',
-                content: `${message.author.username}: ${message.content}`,
+                sender: message.author.username,
+                content: message.content,
             });
             console.log(`[${message.channelId}] ${message.author.username}: ${message.content}`);
 
@@ -183,10 +198,11 @@ export class DiscordClient implements BotClient {
                             // Add the attachment text to the channel messages
                             conversation.addMessage({
                                 role: 'user',
-                                content: `${message.author.username}: file [${attachment.name}]:\n${textContent}`,
+                                sender: message.author.username,
+                                content: `file <${attachment.name}>:\n${textContent}`,
                             });
                             console.log(
-                                `[${message.channelId}] ${message.author.username}: file [${attachment.name}]`
+                                `[${message.channelId}] ${message.author.username}: file <${attachment.name}>`
                             );
                         } catch (error) {
                             console.error(`Error reading attachment ${attachment.name}:`, error);
@@ -198,7 +214,9 @@ export class DiscordClient implements BotClient {
             // Schedule channel processing
             await this.scheduleProcessChannel(message.channel);
         });
-
+        //
+        // COMMAND
+        //
         this.client.on(Events.InteractionCreate, async interaction => {
             if (interaction.isChatInputCommand()) {
                 const command = this.commands.get(interaction.commandName);
@@ -225,32 +243,49 @@ export class DiscordClient implements BotClient {
                 }
             }
         });
+        //
+        // TYPING
+        //
+        this.client.on(Events.TypingStart, async typing => {
+            // Ignore self
+            if (typing.user.id == this.client.user?.id) {
+                return;
+            }
+
+            // Reschedule response if someone is typing
+            const channel = typing.channel as any;
+            if (channel.processTimeout != null && channel.isProcessing == false) {
+                await this.scheduleProcessChannel(channel);
+            }
+        });
     }
 
     private async scheduleProcessChannel(channel: any) {
-        // Reschedule if we are already processing
+        // Drop request if we are already processing
         if (channel.isProcessing == true) {
-            setTimeout(async () => {
-                await this.scheduleProcessChannel(channel);
-            }, settings.process_interval_ms);
             return;
         }
 
         // Clear processChannel schedule
         if (channel.processTimeout != null) {
             clearTimeout(channel.processTimeout);
+            channel.processTimeout = null;
         }
 
         // Schedule processChannel
+        const timingVariance = Math.floor(Math.random() * settings.process_interval_ms);
         channel.processTimeout = setTimeout(async () => {
+            if (channel.isProcessing == true) {
+                return;
+            }
             channel.isProcessing = true;
             try {
                 await this.processChannel(channel);
             } finally {
-                channel.processTimeout = null;
                 channel.isProcessing = false;
+                channel.processTimeout = null;
             }
-        }, settings.process_interval_ms);
+        }, settings.process_interval_ms + timingVariance);
     }
 
     private async sendToChannel(channel: any, message: string, chunkSize = 1000) {
@@ -264,7 +299,7 @@ export class DiscordClient implements BotClient {
     }
 
     private async processChannel(channel: any) {
-        const typingTimeoutMs = 10000;
+        const typingTimeoutMs = 5000;
         const conversation = this.getConversation(channel.id);
 
         // No messages, nothing to do
@@ -272,7 +307,7 @@ export class DiscordClient implements BotClient {
             return;
         }
 
-        // Send typing every 10 seconds as long as bot is working
+        // Send typing every few seconds as long as bot is working
         let typingTimeout: NodeJS.Timeout | undefined;
         function sendTyping() {
             channel.sendTyping();
@@ -280,9 +315,7 @@ export class DiscordClient implements BotClient {
         }
 
         // Hand over control to bot handler - he knows best
-        handleBot(
-            this.botModel,
-            this.botApiHandler,
+        await this.chat(
             conversation,
             async response => {
                 await this.sendToChannel(channel, response);

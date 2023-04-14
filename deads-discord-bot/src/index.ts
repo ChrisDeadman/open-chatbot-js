@@ -10,17 +10,20 @@ import { BotApiHandler } from './bot_api/bot_api_handler.js';
 import { BotClient } from './clients/bot_client.js';
 import { DiscordClient } from './clients/discord_client.js';
 import { TerminalClient } from './clients/terminal_client.js';
+import { MemoryProvider } from './memory/memory_provider.js';
+import { RedisMemory } from './memory/redis_memory_provider.js';
 
 function createClient(
     command: string,
     botModel: BotModel,
+    memory: MemoryProvider,
     botApiHandler: BotApiHandler
 ): BotClient {
     switch (command) {
         case 'discord':
-            return new DiscordClient(botModel, botApiHandler);
+            return new DiscordClient(botModel, memory, botApiHandler);
         default:
-            return new TerminalClient(botModel, botApiHandler);
+            return new TerminalClient(botModel, memory, botApiHandler);
     }
 }
 
@@ -36,14 +39,21 @@ console.log('Loading settings...');
 
 await loadSettings('config/settings.json');
 
+// Create the memory model
+const memory = new RedisMemory(settings.redis_host, settings.redis_port, 1536, `idx:${settings.bot_name}:memory`);
+
 // Create the Bot model
-const botModel: BotModel = new OpenAIBot(settings.bot_name, settings.openai_api_key);
+const botModel: BotModel = new OpenAIBot(
+    settings.bot_name,
+    settings.openai_api_key,
+    settings.openai_model
+);
 
 // Create the Bot API Handler
-const botApiHandler = await BotApiHandler.initApi(botModel);
+const botApiHandler = await BotApiHandler.initApi(botModel, memory);
 
 // Create the Bot client
-const botClient: BotClient = createClient(command, botModel, botApiHandler);
+const botClient: BotClient = createClient(command, botModel, memory, botApiHandler);
 
 // Normal exit
 process.on('beforeExit', async () => {

@@ -1,6 +1,8 @@
+export type ConvMessage = { role: string; sender: string; content: string };
+
 export class ConversationData {
-    history = new Array<any>();
-    pinnedHistory = new Array<any>();
+    history = new Array<ConvMessage>();
+    pinnedHistory = new Array<ConvMessage>();
     language: string;
     history_size: number;
     lastMessageIndex = 0;
@@ -18,26 +20,27 @@ export class ConversationData {
         this.lastMessageIndex = 0;
     }
 
-    isEmpty() {
+    isEmpty(): boolean {
         return this.history.length <= 0 && this.pinnedHistory.length <= 0;
     }
 
-    isFull() {
+    isFull(): boolean {
         return this.history.length >= this.history_size;
     }
 
-    getMessages() {
-        const convHistory =
-            this.nextMessageIndex === this.lastMessageIndex
-                ? this.history
-                : this.history
-                      .slice(this.nextMessageIndex)
-                      .concat(this.history.slice(0, this.nextMessageIndex));
-
-        return this.pinnedHistory.concat(convHistory);
+    getMessages(): ConvMessage[] {
+        return this.nextMessageIndex === this.lastMessageIndex
+            ? this.history
+            : this.history
+                  .slice(this.nextMessageIndex)
+                  .concat(this.history.slice(0, this.nextMessageIndex));
     }
 
-    addMessage(message: any, pinned = false) {
+    getPinnedMessages(): ConvMessage[] {
+        return Array.from(this.pinnedHistory);
+    }
+
+    addMessage(message: ConvMessage, pinned = false) {
         if (pinned) {
             this.pinnedHistory.push(message);
         } else {

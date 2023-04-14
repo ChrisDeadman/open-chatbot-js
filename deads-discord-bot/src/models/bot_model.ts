@@ -1,6 +1,8 @@
-import { ConversationData } from './converstation_data.js';
+import { ConvMessage } from './conversation_data.js';
 
 export interface BotModel {
     name: string;
-    ask: (initial_prompt: [string], conversation: ConversationData) => Promise<string>;
+    fits: (messages: ConvMessage[], tokenLimit?: number) => boolean;
+    chat: (messages: ConvMessage[]) => Promise<string>;
+    createEmbedding: (messages: ConvMessage[]) => Promise<number[]>;
 }

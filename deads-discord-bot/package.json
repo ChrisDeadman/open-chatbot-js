@@ -27,6 +27,8 @@
     "homepage": "https://github.com/ChrisDeadman/deads-discord-bot#readme",
     "dependencies": {
         "@discordjs/rest": "^1.6.0",
+        "@dqbd/tiktoken": "^1.0.6",
+        "@redis/search": "^1.1.2",
         "@types/html-to-text": "^9.0.0",
         "@types/mime-types": "^2.1.1",
         "@types/node": "^18.15.11",
@@ -38,6 +40,7 @@
         "node-fetch": "^3.3.1",
         "openai": "^3.2.1",
         "puppeteer": "^19.8.2",
+        "redis": "^4.6.5",
         "ts-node": "^10.9.1",
         "typescript": "^5.0.3",
         "yargs": "^17.7.1"

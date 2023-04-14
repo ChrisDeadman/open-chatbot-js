@@ -1,92 +1,191 @@
 import { BotApiHandler } from '../bot_api/bot_api_handler.js';
+import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
-import { ConversationData } from '../models/converstation_data.js';
+import { ConvMessage, ConversationData } from '../models/conversation_data.js';
 import { settings } from '../settings.js';
+import { dateTimeToStr } from '../utils/conversion_utils.js';
+import { fixAndParseJson } from '../utils/json_utils.js';
 
-export interface BotClient {
-    startup: () => Promise<void>;
-    shutdown: () => Promise<void>;
-}
+export abstract class BotClient {
+    protected botModel: BotModel;
+    protected memory: MemoryProvider;
+    protected botApiHandler: BotApiHandler;
 
-export async function handleBot(
-    botModel: BotModel,
-    botApiHandler: BotApiHandler,
-    conversation: ConversationData,
-    handleResponse: (response: string) => Promise<void>,
-    startTyping: () => void,
-    stopTyping: () => void
-) {
-    let response = '';
-
-    startTyping();
-    try {
-        // Ask bot
-        response = await botModel.ask(settings.initial_prompt, conversation);
-        if (response.length <= 0) {
-            return;
-        }
-        // Display message to the client
-        await handleResponse(response);
-    } finally {
-        stopTyping();
+    constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: BotApiHandler) {
+        this.botModel = botModel;
+        this.memory = memory;
+        this.botApiHandler = botApiHandler;
     }
 
-    // Compress history
-    if (conversation.isFull()) {
-        const conv_compress = new ConversationData(
-            settings.default_language,
-            conversation.history_size
-        );
-        const messages = conversation.getMessages();
+    abstract startup(): Promise<void>;
 
-        // Build chat history
-        for (let i = 0; i < messages.length; i += 1) {
-            if (i == 0) {
-                // Initialize summary
-                let summary = 'Summary: NONE';
-                if (messages[i].role == 'system') {
-                    summary = messages[i].content;
-                }
-                conv_compress.addMessage({ role: 'system', content: summary });
-            } else if (messages[i].role == 'user') {
-                // Add user messages
-                conv_compress.addMessage(messages[i]);
-            } else if (messages[i].role == 'assistant') {
-                // Add bot messages as user messages
-                conv_compress.addMessage({
-                    role: 'user',
-                    content: `${botModel.name}: ${messages[i].content}`,
-                });
-            }
-        }
+    abstract shutdown(): Promise<void>;
 
-        // Ask the bot to compress the history
-        const resp_compress = await botModel.ask(settings.compress_history_prompt, conv_compress);
-        conversation.clear();
-        conversation.addMessage({ role: 'system', content: resp_compress });
-    }
+    protected async chat(
+        conversation: ConversationData,
+        handleResponse: (response: string) => Promise<void>,
+        startTyping: () => void,
+        stopTyping: () => void,
+        allowCommands = true
+    ) {
+        const maxLoops = 3;
+        let loopIdx = 0;
+        let done = false;
+        let response = '';
 
-    // Add the bot response
-    conversation.addMessage({ role: 'assistant', content: response });
-
-    // Let the bot use the API if it wants
-    botApiHandler.handleAPIRequest(response).then(async req_response => {
-        if (req_response.length > 0) {
-            // Add API response to system messages
-            conversation.addMessage({ role: 'system', content: req_response });
-
+        while (!done && loopIdx < maxLoops) {
+            // chat with bot
             startTyping();
             try {
-                // Reply to bot again with API answer
-                response = await botModel.ask(settings.initial_prompt, conversation);
-                if (response.length <= 0) {
-                    return;
-                }
-                // Display message to the client
-                await handleResponse(response);
+                const messages = await this.getMessages(conversation);
+                response = await this.botModel.chat(messages);
             } finally {
                 stopTyping();
             }
+
+            // assume we are done
+            done = true;
+
+            try {
+                // Store the raw bot response
+                conversation.addMessage({
+                    role: 'assistant',
+                    sender: this.botModel.name,
+                    content: response,
+                });
+
+                // parse bot response
+                const responseData = this.parseResponse(response);
+                response = responseData.message;
+
+                // Display message to the client
+                await handleResponse(response);
+
+                // Execute command
+                if (allowCommands && 'command' in responseData) {
+                    const command = responseData.command['name'].toLowerCase();
+                    const args = responseData.command['args'];
+                    const result = await this.botApiHandler.handleAPIRequest(
+                        command,
+                        args,
+                        conversation
+                    );
+                    if (result.length > 0) {
+                        // Add API response to system messages
+                        conversation.addMessage({
+                            role: 'system',
+                            sender: 'system',
+                            content: result,
+                        });
+
+                        // we are not done, need to return command response to bot
+                        done = false;
+                    }
+                }
+            } catch (error) {
+                // Display error to the client
+                response = `${error}`;
+                await handleResponse(response);
+            }
+
+            // keep track of the loop index
+            loopIdx += 1;
         }
-    });
+    }
+
+    protected async getMessages(conversation: ConversationData): Promise<ConvMessage[]> {
+        const messages = [
+            {
+                role: 'system',
+                sender: 'system',
+                content: settings.initial_prompt
+                    .join('\n')
+                    .replaceAll('$BOT_NAME', this.botModel.name)
+                    .replaceAll('$NOW', dateTimeToStr(new Date()))
+                    .replaceAll('$LANGUAGE', conversation.language),
+            },
+        ];
+
+        // get conversation history
+        const convPinnedMessages = conversation.getPinnedMessages();
+        const convMessages = conversation.getMessages();
+
+        // get memory context
+        const memContext = convMessages.filter(msg => msg.role != 'system').slice(-9);
+
+        // add memories related to the context
+        if (memContext.length > 0) {
+            // get memories
+            const vector = await this.botModel.createEmbedding(memContext);
+            const memories = vector.length > 0 ? await this.memory.get(vector, 10) : [];
+
+            // remove memories until they are under 2500 tokens
+            while (memories.length > 0) {
+                const memoryPrompt = {
+                    role: 'system',
+                    sender: 'system',
+                    content: `This reminds you of these events from your past:\n${memories.join(
+                        '\n'
+                    )}`,
+                };
+                // add max. 2500 memory tokens to messages
+                if (this.botModel.fits(messages.concat([memoryPrompt]), 2500)) {
+                    messages.push(memoryPrompt);
+                    break;
+                }
+                // if not, remove another memory
+                memories.pop();
+            }
+        }
+
+        // add most recent pinned messages first
+        while (convPinnedMessages.length > 0) {
+            // add to messages if there are at least 2000 tokens remaining
+            if (this.botModel.fits(messages.concat(convPinnedMessages), -2000)) {
+                convPinnedMessages.forEach(v => messages.push(v));
+                break;
+            }
+            // if not, remove the oldest pinned message
+            convPinnedMessages.shift();
+        }
+
+        // add most recent messages
+        while (convMessages.length > 0) {
+            // to messages if there are at least 1000 tokens remaining for the response
+            if (this.botModel.fits(messages.concat(convMessages), -1000)) {
+                convMessages.forEach(v => messages.push(v));
+                break;
+            }
+            // if not, remove the oldest message
+            convMessages.shift();
+        }
+
+        return messages;
+    }
+
+    protected parseResponse(response: string): any {
+        if (response.length <= 0) {
+            throw new Error('No response received.');
+        }
+        //console.debug(`RAW RESPONSE: ${response}`);
+
+        let responseData: any;
+        try {
+            responseData = fixAndParseJson(response);
+        } catch (error) {
+            responseData = { message: response };
+        }
+
+        if (!('message' in responseData)) {
+            throw new Error('No message received.');
+        }
+
+        // Strip the botname in case it responds with it
+        const botNamePrefix = `${this.botModel.name}: `;
+        if (String(responseData.message).startsWith(botNamePrefix)) {
+            responseData.message = responseData.message.substring(botNamePrefix.length);
+        }
+
+        return responseData;
+    }
 }

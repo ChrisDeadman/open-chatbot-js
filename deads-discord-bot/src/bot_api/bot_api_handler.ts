@@ -1,62 +1,82 @@
+import { Browser } from 'puppeteer';
+import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
-import { settings } from '../settings.js';
+import { ConversationData } from '../models/conversation_data.js';
+import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { BotBrowser } from './bot_browser.js';
 import { startBrowser } from './start_browser.js';
 
-export class BotApiHandler {
-    botBrowser: BotBrowser;
+export const DEFAULT_COMMAND_RESPONSE = 'No action performed.';
 
-    constructor(botBrowser: BotBrowser) {
-        this.botBrowser = botBrowser;
+export class BotApiHandler {
+    botModel: BotModel;
+    botBrowser: BotBrowser;
+    memory: MemoryProvider;
+
+    constructor(botModel: BotModel, memory: MemoryProvider, browser: Browser) {
+        this.botModel = botModel;
+        this.memory = memory;
+        this.botBrowser = new BotBrowser(botModel, browser);
     }
 
-    async handleAPIRequest(request: string): Promise<string> {
-        const api_regex = /\[API:([^:]+):([^>]+)\]/g;
+    async handleAPIRequest(
+        command: string,
+        args: Record<string, string>,
+        conversation: ConversationData
+    ): Promise<string> {
+        let response = '';
 
-        const matches = request.matchAll(api_regex);
-        for (const match of matches) {
-            const fn = match[1].toLowerCase();
-            const arg = match[2];
+        if (command.length < 0 || command === 'nop') {
+            return response;
+        }
 
-            const apiRequest = `API REQUEST: ${match[0]}`;
-            console.debug(`${apiRequest}`);
+        console.debug(`CMD ${command}(${JSON.stringify(args)})...`);
 
-            let apiResponse = '';
-            switch (fn) {
-                case 'browser': {
+        try {
+            switch (command) {
+                case 'store_memory': {
+                    const context = conversation
+                        .getMessages()
+                        .filter(msg => msg.role != 'system')
+                        .slice(-9);
+                    const vector = await this.botModel.createEmbedding(context);
+                    if (vector.length > 0) {
+                        await this.memory.add(
+                            vector,
+                            `from ${dateTimeToStr(new Date())}: ${args.data}`
+                        );
+                    }
+                    break;
+                }
+                case 'browse_website': {
                     const pageData = await this.botBrowser.getPageData(
-                        settings.default_language,
-                        arg
+                        args.url,
+                        args.question,
+                        conversation.language
                     );
-                    apiResponse = pageData.summary;
+                    response = `"${command}": ${pageData.summary}`;
                     break;
                 }
                 default: {
-                    apiResponse = 'API FUNCTION NOT FOUND';
+                    response = `"${command}": Invalid command.`;
                     break;
                 }
             }
-
-            console.debug(
-                `API RESPONSE: ${this.truncateString(apiResponse, 50).replace('\n', ' ')}`
-            );
-            return `${apiRequest}\n${apiResponse}`;
+        } catch (error) {
+            response = `"${command}": ${error}.`;
         }
 
-        return '';
-    }
-
-    static async initApi(botModel: BotModel): Promise<BotApiHandler> {
-        const browser = await startBrowser();
-        const botBrowser = new BotBrowser(botModel, browser);
-        return new BotApiHandler(botBrowser);
-    }
-
-    private truncateString(str: string, maxLength: number) {
-        if (str.length > maxLength) {
-            return str.slice(0, maxLength) + '...';
+        if (response.length > 0) {
+            console.debug(`CMD ${response.substring(0, 300)}`);
         } else {
-            return str;
+            console.debug(`CMD ${command}: OK`);
         }
+
+        return response;
+    }
+
+    static async initApi(botModel: BotModel, memory: MemoryProvider): Promise<BotApiHandler> {
+        const browser = await startBrowser();
+        return new BotApiHandler(botModel, memory, browser);
     }
 }

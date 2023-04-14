@@ -4,7 +4,6 @@ import { Browser, Page } from 'puppeteer';
 import { settings } from '../settings.js';
 
 import { BotModel } from '../models/bot_model.js';
-import { ConversationData } from '../models/converstation_data.js';
 
 class PageData {
     url: string;
@@ -33,7 +32,7 @@ export class BotBrowser {
         this.browser = browser;
     }
 
-    async getPageData(language: string, url: string) {
+    async getPageData(url: string, question: string, language: string) {
         if (!(language in this.pages)) {
             this.pages[language] = {};
         }
@@ -45,14 +44,14 @@ export class BotBrowser {
         page.lastAccessed = Date.now();
         // load pages that are flagged for loading
         if (page.reload) {
-            const readPagePromise = this.readPage(page);
+            const readPagePromise = this.readPage(page, question, language);
             this.prunePages(pageDict);
             await readPagePromise;
         }
         return page;
     }
 
-    private async readPage(pageData: PageData) {
+    private async readPage(pageData: PageData, question: string, language: string) {
         const chunkSize = 4000;
         const proto_url = pageData.url.replace('http://', '').replace('https://', '');
 
@@ -115,15 +114,22 @@ export class BotBrowser {
 
             // Ask the bot model to update the summary until all content is processed
             while (pageData.content.length > 0) {
-                const conversation = new ConversationData(settings.default_language, 1);
-                conversation.addMessage({
-                    role: 'system',
-                    content: `${pageData.summary}\n\nContent:\n${pageData.content.shift()}`,
-                });
-                pageData.summary = await this.botModel.ask(
-                    settings.bot_browser_prompt,
-                    conversation
-                );
+                const messages = [
+                    {
+                        role: 'system',
+                        sender: 'system',
+                        content: settings.bot_browser_prompt
+                            .join('\n')
+                            .replaceAll('$QUESTION', question)
+                            .replaceAll('$LANGUAGE', language),
+                    },
+                    {
+                        role: 'system',
+                        sender: 'system',
+                        content: `${pageData.summary}\n\nContent:\n${pageData.content.shift()}`,
+                    },
+                ];
+                pageData.summary = await this.botModel.chat(messages);
             }
 
             // Update status

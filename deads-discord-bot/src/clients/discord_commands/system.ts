@@ -12,7 +12,7 @@ export async function execute(client: DiscordClient, interaction: any) {
     const content = interaction.options.getString('message');
     client
         .getConversation(interaction.channelId)
-        .addMessage({ role: 'system', content: content }, true);
+        .addMessage({ role: 'system', sender: 'system', content: content }, true);
     console.log(`[${interaction.channelId}] System Message: ${content}`);
-    await interaction.reply("Added and pinned system message.");
+    await interaction.reply('Added and pinned a system message.');
 }

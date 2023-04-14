@@ -1,102 +1,159 @@
 import axios from 'axios';
 import { Job, Queue, QueueEvents, Worker } from 'bullmq';
-import { Configuration, OpenAIApi } from 'openai';
+import { ChatCompletionRequestMessageRoleEnum, Configuration, OpenAIApi } from 'openai';
 import { settings } from '../settings.js';
+import { countStringTokens } from '../utils/token_utils.js';
 import { BotModel } from './bot_model.js';
-import { ConversationData } from './converstation_data.js';
-type JobData = { messages: any[]; language: string };
-type JobResult = string;
+import { ConvMessage } from './conversation_data.js';
+
+enum JobType {
+    chat = 'chat',
+    createEmbedding = 'createEmbedding',
+}
+
+type JobData = { messages: ConvMessage[] };
 
 export class OpenAIBot implements BotModel {
     name: string;
     private openai: OpenAIApi;
     private model: string;
-    private chatQueue = new Queue<JobData, JobResult>('processChatJob');
+    private chatQueue: Queue<JobData, any>;
     private chatQueueEvents: QueueEvents;
     private worker: Worker;
 
-    constructor(name: string, openai_api_key: string, model = settings.openai_model) {
+    constructor(name: string, openai_api_key: string, model: string) {
         this.name = name;
         this.openai = new OpenAIApi(new Configuration({ apiKey: openai_api_key }));
         this.model = model;
-        this.chatQueueEvents = new QueueEvents(this.chatQueue.name);
-        this.chatQueue.obliterate({ force: true }); // remove old jobs
-        this.worker = this.createWorker();
-    }
 
-    private createWorker(): Worker {
-        return new Worker(this.chatQueue.name, this.processChatJob.bind(this), {
+        this.chatQueue = new Queue<JobData, any>(`queue:${name}:jobs`, {
+            connection: {
+                host: settings.redis_host,
+                port: settings.redis_port,
+            },
+        });
+        this.chatQueue.obliterate({ force: true }); // remove old jobs
+        this.chatQueueEvents = new QueueEvents(this.chatQueue.name, {
+            connection: {
+                host: settings.redis_host,
+                port: settings.redis_port,
+            },
+        });
+        this.worker = new Worker(this.chatQueue.name, this.processChatJob.bind(this), {
+            connection: {
+                host: settings.redis_host,
+                port: settings.redis_port,
+            },
             limiter: {
                 max: 1,
-                duration: 2000,
+                duration: settings.openai_rate_limit_ms,
             },
         });
     }
 
-    async ask(initial_prompt: [string], conversation: ConversationData): Promise<string> {
-        const job = await this.chatQueue.add('ask', {
-            messages: this.getMessages(initial_prompt, conversation),
-            language: conversation.language,
-        });
-        const response = await job.waitUntilFinished(this.chatQueueEvents);
-        // Strip the botname in case it responds with it
-        const prefix = `${this.name}: `;
-        if (response.startsWith(prefix)) {
-            return response.substring(prefix.length);
-        }
-        return response;
+    fits(messages: ConvMessage[], tokenLimit?: number): boolean {
+        const limit =
+            tokenLimit != null
+                ? tokenLimit >= 0
+                    ? Math.min(tokenLimit, settings.openai_token_limit)
+                    : settings.openai_token_limit - tokenLimit
+                : settings.openai_token_limit;
+
+        const numTokens = countStringTokens(
+            messages
+                .map(this.convMessageToOpenAIMessage.bind(this))
+                .map(message => message.content),
+            this.model
+        );
+
+        return numTokens <= limit;
     }
 
-    private async processChatJob(job: Job<JobData>): Promise<string> {
+    async chat(messages: ConvMessage[]): Promise<string> {
+        const job = await this.chatQueue.add(JobType.chat.toString(), {
+            messages: messages,
+        });
+        return await job.waitUntilFinished(this.chatQueueEvents);
+    }
+
+    async createEmbedding(messages: ConvMessage[]): Promise<number[]> {
+        const job = await this.chatQueue.add(JobType.createEmbedding.toString(), {
+            messages: messages,
+        });
+        return await job.waitUntilFinished(this.chatQueueEvents);
+    }
+
+    private async processChatJob(job: Job<JobData>): Promise<any> {
         try {
-            console.debug(`OpenAI: sending ${job.data.messages.length} messages...`);
+            console.debug(`OpenAI: ${job.name} with ${job.data.messages.length} messages...`);
             const startTime = Date.now();
-            const completion = await this.openai.createChatCompletion(
-                {
-                    model: this.model,
-                    messages: job.data.messages,
-                },
-                {
-                    timeout: settings.www_timeout,
+            let result: any;
+            switch (JobType[job.name as keyof typeof JobType]) {
+                case JobType.chat: {
+                    result = await this.createChatCompletion(job.data.messages);
+                    break;
                 }
-            );
+                case JobType.createEmbedding: {
+                    result = await this._createEmbedding(job.data.messages);
+                    break;
+                }
+                default: {
+                    throw new Error('Job Type not implemented.');
+                }
+            }
+
             const endTime = Date.now();
             const elapsedMs = endTime - startTime;
             console.debug(`OpenAI: response received after ${elapsedMs}ms`);
-            const message = completion.data.choices[0].message;
-            return message ? message.content : '[EMPTY]';
+            this.worker.rateLimit(settings.openai_rate_limit_ms);
+            return result;
         } catch (error) {
             console.error(`OpenAI: ${error}`);
             if (axios.isAxiosError(error)) {
                 // Obey OpenAI rate limit or retry on timeout
                 const status = error.response?.status;
                 if (status === undefined || status == 429) {
-                    await this.worker.rateLimit(2000);
+                    this.worker.rateLimit(settings.openai_rate_limit_ms);
                     throw Worker.RateLimitError();
                 }
             }
-            return String(error);
+            return error;
         }
     }
 
-    private getMessages(initial_prompt: [string], conversation: ConversationData): any {
-        const now = new Date().toLocaleString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: 'numeric',
-            timeZoneName: 'short',
-        });
-        return [
+    private async createChatCompletion(messages: ConvMessage[]) {
+        const completion = await this.openai.createChatCompletion(
             {
-                role: 'system',
-                content: initial_prompt
-                    .join('\n')
-                    .replaceAll('$BOT_NAME', this.name)
-                    .replaceAll('$NOW', now)
-                    .replaceAll('$LANGUAGE', conversation.language),
+                model: this.model,
+                messages: messages.map(this.convMessageToOpenAIMessage.bind(this)),
             },
-        ].concat(conversation.getMessages());
+            {
+                timeout: settings.www_timeout,
+            }
+        );
+        const message = completion.data.choices[0].message;
+        return message ? message.content : '';
+    }
+
+    private async _createEmbedding(messages: ConvMessage[]): Promise<number[]> {
+        const result = await this.openai.createEmbedding({
+            input: messages.map(msg => msg.content),
+            model: 'text-embedding-ada-002',
+        });
+        return result.data.data[0].embedding;
+    }
+
+    private convMessageToOpenAIMessage(message: ConvMessage): {
+        role: ChatCompletionRequestMessageRoleEnum;
+        content: string;
+    } {
+        const role = message.role as ChatCompletionRequestMessageRoleEnum;
+        return {
+            role: role,
+            content:
+                role === ChatCompletionRequestMessageRoleEnum.User
+                    ? `${message.sender}: ${message.content}`
+                    : message.content,
+        };
     }
 }

@@ -53,7 +53,7 @@ export async function startBrowser() {
 
     const browser = await puppeteer.launch({
         headless: 'new',
-        timeout: 6000,
+        timeout: 10000,
         args: browserArgs,
     });
     await browser.version();
