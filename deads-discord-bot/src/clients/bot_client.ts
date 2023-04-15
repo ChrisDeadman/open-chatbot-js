@@ -56,10 +56,11 @@ export abstract class BotClient {
 
                 // parse bot response
                 const responseData = this.parseResponse(response);
-                response = responseData.message;
 
                 // Display message to the client
-                await handleResponse(response);
+                if (responseData.message.length > 0) {
+                    await handleResponse(responseData.message);
+                }
 
                 // Execute command
                 if (allowCommands && 'command' in responseData) {
@@ -84,8 +85,7 @@ export abstract class BotClient {
                 }
             } catch (error) {
                 // Display error to the client
-                response = `${error}`;
-                await handleResponse(response);
+                await handleResponse(String(error));
             }
 
             // keep track of the loop index
@@ -199,7 +199,8 @@ export abstract class BotClient {
         }
 
         if (!('message' in responseData)) {
-            throw new Error('No message received.');
+            responseData['message'] = '';
+            console.warn('No message received');
         }
 
         // Strip the botname in case it responds with it
