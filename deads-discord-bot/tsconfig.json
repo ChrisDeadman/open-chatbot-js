@@ -6,6 +6,7 @@
         "lib": ["es2021"],
         "outDir": "./dist",
         "moduleResolution": "node",
+        "typeRoots": ["./types", "./node_modules/@types"],
         "strict": true,
         "allowJs": false,
         "sourceMap": true,

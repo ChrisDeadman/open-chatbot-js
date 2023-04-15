@@ -9,10 +9,9 @@ export const data = new SlashCommandBuilder()
     );
 
 export async function execute(client: DiscordClient, interaction: any) {
+    const conversation = client.getConversation(interaction.channelId);
     const content = interaction.options.getString('message');
-    client
-        .getConversation(interaction.channelId)
-        .addMessage({ role: 'system', sender: 'system', content: content }, true);
+    conversation.addMessage({ role: 'system', sender: 'system', content: content }, true);
     console.log(`[${interaction.channelId}] System Message: ${content}`);
-    await interaction.reply('Added and pinned a system message.');
+    await interaction.reply('System message received.');
 }

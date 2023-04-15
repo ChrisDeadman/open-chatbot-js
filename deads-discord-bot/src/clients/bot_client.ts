@@ -124,9 +124,7 @@ export abstract class BotClient {
                 const memoryPrompt = {
                     role: 'system',
                     sender: 'system',
-                    content: `This reminds you of these events from your past:\n${memories.join(
-                        '\n'
-                    )}`,
+                    content: `Recall these stored memories:\n${memories.join('\n')}`,
                 };
                 // add max. 2500 memory tokens to messages
                 if (this.botModel.fits(messages.concat([memoryPrompt]), 2500)) {
@@ -167,11 +165,38 @@ export abstract class BotClient {
         if (response.length <= 0) {
             throw new Error('No response received.');
         }
-        //console.debug(`RAW RESPONSE: ${response}`);
+        console.debug(`RAW RESPONSE: ${response}`);
 
         let responseData: any;
         try {
+            // Fix and parse json
             responseData = fixAndParseJson(response);
+
+            // use original string if parser wrongly assumes an array of size 1
+            if (Array.isArray(responseData) && responseData.length < 2) {
+                responseData = response;
+            }
+
+            // Combine multiple responses
+            if (Array.isArray(responseData)) {
+                const responseDataArr = responseData;
+                responseData = { message: '', command: { name: 'nop', args: {} } };
+                responseDataArr.forEach(r => {
+                    if ('message' in r) {
+                        responseData.message += r.message;
+                    }
+                    if ('command' in r) {
+                        if (r.command['name'] != 'nop') {
+                            responseData.command = r.command;
+                        }
+                    }
+                });
+            }
+
+            // Account for non-json response
+            if (typeof responseData === 'string') {
+                responseData = { message: responseData };
+            }
         } catch (error) {
             responseData = { message: response };
         }

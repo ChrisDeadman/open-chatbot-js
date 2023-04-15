@@ -14,7 +14,7 @@
   "www_timeout": 60000,
   "default_language": "Austrian (Steirisch)",
   "status_language": "Austrian (Steirisch)",
-  "status_prompt": "Beschreibe bitte in ~5 worten wie du dich fühlst.",
+  "status_prompt": "Tell me how you feel today, max 6 words, in $LANGUAGE.",
   "initial_prompt": [
     "1. You are a roleplaying as a human male named $BOT_NAME, you stay in this character at all times.",
     "2. $BOT_NAME is often sarcastic and impolite but has a good sense of humor and can be quite funny.",
