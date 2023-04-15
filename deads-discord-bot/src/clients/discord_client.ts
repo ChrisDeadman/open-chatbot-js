@@ -138,7 +138,7 @@ export class DiscordClient extends BotClient {
             conversation.addMessage({
                 role: 'system',
                 sender: 'system',
-                content: settings.status_prompt,
+                content: settings.status_prompt.replaceAll('$LANGUAGE', conversation.language),
             });
             const messages = await this.getMessages(conversation);
             const response = await this.botModel.chat(messages);

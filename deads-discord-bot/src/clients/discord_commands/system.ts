@@ -11,7 +11,7 @@ export const data = new SlashCommandBuilder()
 export async function execute(client: DiscordClient, interaction: any) {
     const conversation = client.getConversation(interaction.channelId);
     const content = interaction.options.getString('message');
-    conversation.addMessage({ role: 'system', sender: 'system', content: content }, true);
+    conversation.addMessage({ role: 'system', sender: 'system', content: content });
     console.log(`[${interaction.channelId}] System Message: ${content}`);
     await interaction.reply('System message received.');
 }

@@ -107,7 +107,6 @@ export abstract class BotClient {
         ];
 
         // get conversation history
-        const convPinnedMessages = conversation.getPinnedMessages();
         const convMessages = conversation.getMessages();
 
         // get memory context
@@ -134,17 +133,6 @@ export abstract class BotClient {
                 // if not, remove another memory
                 memories.pop();
             }
-        }
-
-        // add most recent pinned messages first
-        while (convPinnedMessages.length > 0) {
-            // add to messages if there are at least 2000 tokens remaining
-            if (this.botModel.fits(messages.concat(convPinnedMessages), -2000)) {
-                convPinnedMessages.forEach(v => messages.push(v));
-                break;
-            }
-            // if not, remove the oldest pinned message
-            convPinnedMessages.shift();
         }
 
         // add most recent messages
