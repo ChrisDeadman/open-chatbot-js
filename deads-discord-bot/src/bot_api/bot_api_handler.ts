@@ -1,7 +1,7 @@
 import { Browser } from 'puppeteer';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
-import { ConversationData } from '../models/conversation_data.js';
+import { ConvMessage, ConversationData } from '../models/conversation_data.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { BotBrowser } from './bot_browser.js';
 import { startBrowser } from './start_browser.js';
@@ -35,16 +35,24 @@ export class BotApiHandler {
         try {
             switch (command) {
                 case 'store_memory': {
-                    const context = conversation
-                        .getMessages()
-                        .filter(msg => msg.role != 'system')
-                        .slice(-9);
-                    const vector = await this.botModel.createEmbedding(context);
-                    if (vector.length > 0) {
-                        await this.memory.add(
-                            vector,
-                            `from ${dateTimeToStr(new Date())}: ${args.data}`
-                        );
+                    let context: ConvMessage[] = [];
+                    for (let i=-9; i <= 0; i+= 1) {
+                        context = conversation
+                            .getMessages()
+                            .filter(msg => msg.role != 'system')
+                            .slice(i);
+                        if (this.botModel.fits(context)) {
+                            break;
+                        }
+                    }
+                    if (context.length > 0) {
+                        const vector = await this.botModel.createEmbedding(context);
+                        if (vector.length > 0) {
+                            await this.memory.add(
+                                vector,
+                                `from ${dateTimeToStr(new Date())}: ${args.data}`
+                            );
+                        }
                     }
                     break;
                 }

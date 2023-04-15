@@ -110,7 +110,16 @@ export abstract class BotClient {
         const convMessages = conversation.getMessages();
 
         // get memory context
-        const memContext = convMessages.filter(msg => msg.role != 'system').slice(-9);
+        let memContext: ConvMessage[] = [];
+        for (let i = -9; i <= 0; i += 1) {
+            memContext = conversation
+                .getMessages()
+                .filter(msg => msg.role != 'system')
+                .slice(i);
+            if (this.botModel.fits(memContext)) {
+                break;
+            }
+        }
 
         // add memories related to the context
         if (memContext.length > 0) {

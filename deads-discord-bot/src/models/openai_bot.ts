@@ -77,10 +77,30 @@ export class OpenAIBot implements BotModel {
     }
 
     async createEmbedding(messages: ConvMessage[]): Promise<number[]> {
-        const job = await this.chatQueue.add(JobType.createEmbedding.toString(), {
-            messages: messages,
-        });
-        return await job.waitUntilFinished(this.chatQueueEvents);
+        let memContext: ConvMessage[] = [];
+        for (let i = -9; i <= 0; i += 1) {
+            memContext = messages.filter(msg => msg.role != 'system').slice(i);
+            const numTokens = countStringTokens(
+                messages
+                    .map(this.convMessageToOpenAIMessage.bind(this))
+                    .map(message => message.content),
+                settings.openai_embedding_model
+            );
+            if (numTokens <= settings.openai_token_limit) {
+                break;
+            }
+        }
+
+        if (memContext.length > 0) {
+            const job = await this.chatQueue.add(JobType.createEmbedding.toString(), {
+                messages: memContext,
+            });
+            const result = await job.waitUntilFinished(this.chatQueueEvents);
+            if (result != null) {
+                return result;
+            }
+        }
+        return [];
     }
 
     private async processChatJob(job: Job<JobData>): Promise<any> {
@@ -136,9 +156,10 @@ export class OpenAIBot implements BotModel {
     }
 
     private async _createEmbedding(messages: ConvMessage[]): Promise<number[]> {
+        const input = messages.map(msg => msg.content).join('\n');
         const result = await this.openai.createEmbedding({
-            input: messages.map(msg => msg.content),
-            model: 'text-embedding-ada-002',
+            input: input,
+            model: settings.openai_embedding_model,
         });
         return result.data.data[0].embedding;
     }
