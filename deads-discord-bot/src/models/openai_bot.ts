@@ -73,7 +73,11 @@ export class OpenAIBot implements BotModel {
         const job = await this.chatQueue.add(JobType.chat.toString(), {
             messages: messages,
         });
-        return await job.waitUntilFinished(this.chatQueueEvents);
+        const result = await job.waitUntilFinished(this.chatQueueEvents);
+        if (result != null) {
+            return result;
+        }
+        return '';
     }
 
     async createEmbedding(messages: ConvMessage[]): Promise<number[]> {
@@ -103,11 +107,11 @@ export class OpenAIBot implements BotModel {
         return [];
     }
 
-    private async processChatJob(job: Job<JobData>): Promise<any> {
+    private async processChatJob(job: Job<JobData>): Promise<any | null> {
+        let result: any;
         try {
             console.debug(`OpenAI: ${job.name} with ${job.data.messages.length} messages...`);
             const startTime = Date.now();
-            let result: any;
             switch (JobType[job.name as keyof typeof JobType]) {
                 case JobType.chat: {
                     result = await this.createChatCompletion(job.data.messages);
@@ -126,7 +130,6 @@ export class OpenAIBot implements BotModel {
             const elapsedMs = endTime - startTime;
             console.debug(`OpenAI: response received after ${elapsedMs}ms`);
             this.worker.rateLimit(settings.openai_rate_limit_ms);
-            return result;
         } catch (error) {
             console.error(`OpenAI: ${error}`);
             if (axios.isAxiosError(error)) {
@@ -137,11 +140,11 @@ export class OpenAIBot implements BotModel {
                     throw Worker.RateLimitError();
                 }
             }
-            return error;
         }
+        return result;
     }
 
-    private async createChatCompletion(messages: ConvMessage[]) {
+    private async createChatCompletion(messages: ConvMessage[]): Promise<string> {
         const completion = await this.openai.createChatCompletion(
             {
                 model: this.model,

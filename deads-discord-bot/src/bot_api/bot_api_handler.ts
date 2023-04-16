@@ -1,7 +1,7 @@
 import { Browser } from 'puppeteer';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
-import { ConvMessage, ConversationData } from '../models/conversation_data.js';
+import { ConversationData } from '../models/conversation_data.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { BotBrowser } from './bot_browser.js';
 import { startBrowser } from './start_browser.js';
@@ -35,34 +35,34 @@ export class BotApiHandler {
         try {
             switch (command) {
                 case 'store_memory': {
-                    let context: ConvMessage[] = [];
-                    for (let i=-9; i <= 0; i+= 1) {
-                        context = conversation
-                            .getMessages()
-                            .filter(msg => msg.role != 'system')
-                            .slice(i);
-                        if (this.botModel.fits(context)) {
-                            break;
-                        }
+                    const messages = conversation.getMessages().filter(msg => msg.role != 'system');
+                    const vector = await this.botModel.createEmbedding(messages);
+                    const data = `from ${dateTimeToStr(new Date())}: ${args.data}`;
+                    if (vector.length > 0) {
+                        await this.memory.add(vector, data);
                     }
-                    if (context.length > 0) {
-                        const vector = await this.botModel.createEmbedding(context);
-                        if (vector.length > 0) {
-                            await this.memory.add(
-                                vector,
-                                `from ${dateTimeToStr(new Date())}: ${args.data}`
-                            );
-                        }
+                    break;
+                }
+                case 'delete_memory': {
+                    const messages = [
+                        { role: 'assistant', sender: this.botModel.name, content: args.data },
+                    ];
+                    const vector = await this.botModel.createEmbedding(messages);
+                    if (vector.length > 0) {
+                        await this.memory.del(vector);
                     }
                     break;
                 }
                 case 'browse_website': {
+                    response = `"${command}": ERROR: Your browser is broken.`;
+                    /*
                     const pageData = await this.botBrowser.getPageData(
                         args.url,
                         args.question,
                         conversation.language
                     );
                     response = `"${command}": ${pageData.summary}`;
+                    */
                     break;
                 }
                 default: {

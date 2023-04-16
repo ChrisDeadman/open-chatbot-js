@@ -7,8 +7,8 @@ import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { fixAndParseJson } from '../utils/json_utils.js';
 
 export abstract class BotClient {
-    protected botModel: BotModel;
-    protected memory: MemoryProvider;
+    public botModel: BotModel;
+    public memory: MemoryProvider;
     protected botApiHandler: BotApiHandler;
 
     constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: BotApiHandler) {
@@ -106,22 +106,8 @@ export abstract class BotClient {
             },
         ];
 
-        // get conversation history
-        const convMessages = conversation.getMessages();
-
-        // get memory context
-        let memContext: ConvMessage[] = [];
-        for (let i = -9; i <= 0; i += 1) {
-            memContext = conversation
-                .getMessages()
-                .filter(msg => msg.role != 'system')
-                .slice(i);
-            if (this.botModel.fits(memContext)) {
-                break;
-            }
-        }
-
         // add memories related to the context
+        const memContext = conversation.getMessages().filter(msg => msg.role != 'system');
         if (memContext.length > 0) {
             // get memories
             const vector = await this.botModel.createEmbedding(memContext);
@@ -145,6 +131,7 @@ export abstract class BotClient {
         }
 
         // add most recent messages
+        const convMessages = conversation.getMessages();
         while (convMessages.length > 0) {
             // to messages if there are at least 1000 tokens remaining for the response
             if (this.botModel.fits(messages.concat(convMessages), -1000)) {
@@ -177,14 +164,14 @@ export abstract class BotClient {
             // Combine multiple responses
             if (Array.isArray(responseData)) {
                 const responseDataArr = responseData;
-                responseData = { message: '', command: { name: 'nop', args: {} } };
+                responseData = { message: '' };
                 responseDataArr.forEach(r => {
                     if ('message' in r) {
                         responseData.message += r.message;
                     }
                     if ('command' in r) {
                         if (r.command['name'] != 'nop') {
-                            responseData.command = r.command;
+                            responseData['command'] = r.command;
                         }
                     }
                 });
@@ -198,15 +185,20 @@ export abstract class BotClient {
             responseData = { message: response };
         }
 
+        // Bot might omit message field
         if (!('message' in responseData)) {
             responseData['message'] = '';
-            console.warn('No message received');
+        }
+
+        // Bot might omit command field
+        if (!('command' in responseData)) {
+            responseData['command'] = { name: 'nop', args: {} };
         }
 
         // Strip the botname in case it responds with it
         const botNamePrefix = `${this.botModel.name}: `;
         if (String(responseData.message).startsWith(botNamePrefix)) {
-            responseData.message = responseData.message.substring(botNamePrefix.length);
+            responseData.message = responseData.message.slice(botNamePrefix.length);
         }
 
         return responseData;

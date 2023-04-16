@@ -294,7 +294,7 @@ export class DiscordClient extends BotClient {
         console.log(`[${channel.id}] ${this.botModel.name}: ${message}`);
 
         for (let chunk = 0, idx = 0; chunk < numChunks; ++chunk, idx += chunkSize) {
-            await channel.send(message.substring(idx, idx + chunkSize));
+            await channel.send(message.slice(idx, idx + chunkSize));
         }
     }
 

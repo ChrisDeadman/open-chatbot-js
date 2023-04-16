@@ -42,6 +42,9 @@ await loadSettings('config/settings.json');
 // Create the memory model
 const memory = new RedisMemory(settings.redis_host, settings.redis_port, 1536, `idx:${settings.bot_name}:memory`);
 
+// TODO: Clear always for now
+memory.clear();
+
 // Create the Bot model
 const botModel: BotModel = new OpenAIBot(
     settings.bot_name,

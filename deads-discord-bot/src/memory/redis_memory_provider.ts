@@ -8,7 +8,6 @@ export class RedisMemory extends MemoryProvider {
     private vectorDim: number;
     private memoryIndex: string;
     private searchPrefix: string;
-    private vecNum: number;
     private initComplete: Promise<void>;
 
     constructor(
@@ -22,7 +21,6 @@ export class RedisMemory extends MemoryProvider {
         this.vectorDim = vectorDim;
         this.memoryIndex = memoryIndex;
         this.searchPrefix = searchPrefix;
-        this.vecNum = 0;
 
         this.redis = createClient({
             socket: {
@@ -51,13 +49,38 @@ export class RedisMemory extends MemoryProvider {
             embedding: toFloat32Buffer(vector),
         };
 
-        await this.redis
-            .multi()
-            .hSet(`${this.searchPrefix}:${this.vecNum}`, dataDict)
-            .set(`${this.searchPrefix}-vec_num`, this.vecNum + 1)
-            .exec();
+        // Use INCR to generate a unique identifier for the hash
+        const id = await this.redis.incr(`${this.searchPrefix}:id`);
 
-        this.vecNum += 1;
+        // Use the generated ID as the key for the hash
+        await this.redis.hSet(`${this.searchPrefix}:${id}`, dataDict);
+    }
+
+    async del(vector: number[]) {
+        await this.initComplete;
+
+        if (vector.length != this.vectorDim) {
+            throw Error(`vector dimension must be exactly ${this.vectorDim}.`);
+        }
+
+        const baseQuery = `*=>[KNN 1 @embedding $vector AS dist]`;
+        const results = await this.redis.ft.search(this.memoryIndex, baseQuery, {
+            PARAMS: {
+                vector: toFloat32Buffer(vector),
+            },
+            SORTBY: 'dist',
+            DIALECT: 2,
+            RETURN: ['id'],
+        });
+
+        // no results found, nothing to delete
+        if (results.total === 0) {
+            return;
+        }
+
+        // delete the document from the Redis database
+        const docId = results.documents[0].id;
+        await this.redis.del(docId);
     }
 
     async get(vector: number[], numRelevant = 1): Promise<string[]> {
@@ -88,9 +111,13 @@ export class RedisMemory extends MemoryProvider {
 
     async clear() {
         await this.initComplete;
-        await this.redis.ft.dropIndex(this.memoryIndex, { DD: true });
-        await this.redis.set(`${this.searchPrefix}-vec_num`, 0);
+        await this.dropIndex();
         await this.createIndex();
+    }
+
+    private async dropIndex() {
+        await this.redis.ft.dropIndex(this.memoryIndex, { DD: true });
+        console.info(`dropped redis index ${this.memoryIndex}.`);
     }
 
     private async createIndex() {
@@ -120,7 +147,5 @@ export class RedisMemory extends MemoryProvider {
             // see https://github.com/RediSearch/RediSearch/issues/1656
             console.warn(error);
         }
-        const vecNum = await this.redis.get(`${this.searchPrefix}-vec_num`);
-        this.vecNum = vecNum != null ? parseInt(vecNum.toString(), 10) : 0;
     }
 }
