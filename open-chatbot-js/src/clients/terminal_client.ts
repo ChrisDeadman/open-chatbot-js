@@ -10,8 +10,16 @@ export class TerminalClient extends BotClient {
     private rlInterface: any;
     protected conversation: ConversationData;
 
-    constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: CommandApi) {
+    private username;
+
+    constructor(
+        botModel: BotModel,
+        memory: MemoryProvider,
+        botApiHandler: CommandApi,
+        username = 'Developer'
+    ) {
         super(botModel, memory, botApiHandler);
+        this.username = username;
         this.conversation = new ConversationData(
             settings.default_language,
             settings.message_history_size
@@ -25,8 +33,6 @@ export class TerminalClient extends BotClient {
         });
 
         this.initEventListeners();
-
-        console.log('Bot startup complete.');
     }
 
     async shutdown() {
@@ -40,7 +46,7 @@ export class TerminalClient extends BotClient {
                 // Add new message to conversation
                 this.conversation.addMessage({
                     role: 'user',
-                    sender: 'Developer',
+                    sender: this.username,
                     content: `${line}`,
                 });
 
@@ -56,6 +62,9 @@ export class TerminalClient extends BotClient {
             } catch (error) {
                 console.error(error);
             }
+            process.stdout.write(`${this.username}> `);
         });
+        console.log('Bot startup complete.');
+        process.stdout.write(`${this.username}> `);
     }
 }

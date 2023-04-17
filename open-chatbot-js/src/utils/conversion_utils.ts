@@ -1,9 +1,9 @@
-export function dateTimeToStr(date: Date): string {
-    return date.toLocaleString('en-US', {
+export function dateTimeToStr(date: Date, locale: string): string {
+    return date.toLocaleString(locale, {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
-        year: "numeric",
+        year: 'numeric',
         hour: 'numeric',
         minute: 'numeric',
         timeZoneName: 'short',

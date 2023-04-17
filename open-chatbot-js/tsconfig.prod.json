@@ -1,12 +1,11 @@
 {
     "compilerOptions": {
-        "target": "es2021",
+        "target": "ES2022",
         "types": ["node"],
-        "module": "es2022",
-        "lib": ["es2021"],
+        "module": "ES2022",
+        "lib": ["ES2022"],
         "outDir": "./dist",
         "moduleResolution": "node",
-        "typeRoots": ["./types", "./node_modules/@types"],
         "strict": true,
         "allowJs": false,
         "sourceMap": true,

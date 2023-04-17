@@ -8,7 +8,7 @@ describe('TestJsonUtils', () => {
 
     test('test_valid_quotes_in_text', () => {
         const jsonStr = '{"name": "Ho\'ns", "age": 40, "gender": "AI"}';
-        expect(fixAndParseJson(jsonStr)).toEqual({ name: 'Ho\'ns', age: 40, gender: 'AI' });
+        expect(fixAndParseJson(jsonStr)).toEqual({ name: "Ho'ns", age: 40, gender: 'AI' });
     });
 
     test('test_invalid_json_just_text', () => {
@@ -60,8 +60,11 @@ describe('TestJsonUtils', () => {
     });
 
     test('test_invalid_multiple_json_objects', () => {
-        const jsonStr =
-            '{"name": "Hons", "info": {"age": 40, "gender": "AI"}}\n\n{"name": "Eve", "info": {"age": 35, "gender": "AI"}}';
+        const jsonStr = [
+            'some text before{"name": "Hons", "info": {"age": 40, "gender": "AI"}}\n',
+            'Some text in between\n',
+            '{"name": "Eve", "info": {"age": 35, "gender": "AI"}}some text after',
+        ].join('\n');
         expect(fixAndParseJson(jsonStr)).toEqual([
             { name: 'Hons', info: { age: 40, gender: 'AI' } },
             { name: 'Eve', info: { age: 35, gender: 'AI' } },

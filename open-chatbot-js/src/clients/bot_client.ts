@@ -11,11 +11,7 @@ export abstract class BotClient {
     public memory: MemoryProvider;
     protected botApiHandler: CommandApi;
 
-    constructor(
-        botModel: BotModel,
-        memory: MemoryProvider,
-        botApiHandler: CommandApi
-    ) {
+    constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: CommandApi) {
         this.botModel = botModel;
         this.memory = memory;
         this.botApiHandler = botApiHandler;
@@ -105,7 +101,7 @@ export abstract class BotClient {
                 content: settings.initial_prompt
                     .join('\n')
                     .replaceAll('$BOT_NAME', this.botModel.name)
-                    .replaceAll('$NOW', dateTimeToStr(new Date()))
+                    .replaceAll('$NOW', dateTimeToStr(new Date(), settings.locale))
                     .replaceAll('$LANGUAGE', conversation.language),
             },
         ];
@@ -117,19 +113,19 @@ export abstract class BotClient {
             const vector = await this.botModel.createEmbedding(memContext);
             const memories = vector.length > 0 ? await this.memory.get(vector, 10) : [];
 
-            // remove memories until they are under 2500 tokens
+            // add limited amount of memories
             while (memories.length > 0) {
                 const memoryPrompt = {
                     role: 'system',
                     sender: 'system',
                     content: `Recall these stored memories:\n${memories.join('\n')}`,
                 };
-                // add max. 2500 memory tokens to messages
-                if (this.botModel.fits(messages.concat([memoryPrompt]), 2500)) {
+                // add memory tokens to messages if they fit
+                if (this.botModel.fits(messages.concat([memoryPrompt]), 2000)) {
                     messages.push(memoryPrompt);
                     break;
                 }
-                // if not, remove another memory
+                // if not, remove another memory and try again
                 memories.pop();
             }
         }
@@ -137,8 +133,8 @@ export abstract class BotClient {
         // add most recent messages
         const convMessages = conversation.getMessages();
         while (convMessages.length > 0) {
-            // to messages if there are at least 1000 tokens remaining for the response
-            if (this.botModel.fits(messages.concat(convMessages), -1000)) {
+            // as long as there are enough tokens remaining for the response
+            if (this.botModel.fits(messages.concat(convMessages), -2000)) {
                 convMessages.forEach(v => messages.push(v));
                 break;
             }

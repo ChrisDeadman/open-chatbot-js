@@ -51,16 +51,22 @@ export function fixAndParseJson(jsonStr: string): any {
     jsonStr = correctJson(jsonStr);
 
     // multiple json objects handling
+    const objects: any[] = [];
     const lines = jsonStr.split('\n').filter(l => l);
     if (lines.length > 1) {
-        const objects: any[] = [];
         try {
             for (let i = 0; i < lines.length; i += 1) {
-                const cLine = correctJson(lines[i]);
-                const object = parse(cLine);
-                objects.push(object);
+                const cLine = correctJson(lines[i]).trim();
+                if (cLine.length >= 0) {
+                    const object = parse(cLine);
+                    if (typeof object != 'string') {
+                        objects.push(object);
+                    }
+                }
             }
-            if (!objects.some(item => typeof item === 'string')) {
+            // don't treat as multiple objects if only one object
+            // (unless normal parsing fails later)
+            if (objects.length > 1) {
                 return objects;
             }
         } catch (error) {
@@ -73,7 +79,7 @@ export function fixAndParseJson(jsonStr: string): any {
     try {
         result = parse(jsonStr);
     } catch (error) {
-        result = '';
+        result = objects;
     }
 
     // return original string if parsing did not work

@@ -1,3 +1,3 @@
 #!/bin/sh
 
-node dist/index.js $@
+NODE_ENV=production node dist/index.js $@

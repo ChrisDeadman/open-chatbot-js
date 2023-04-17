@@ -7,9 +7,11 @@ import { BotModel } from './models/bot_model.js';
 import { OpenAIBot } from './models/openai_bot.js';
 
 import { CommandApi } from './bot_api/command_api.js';
+import { SpeechApi } from './bot_api/speech_api.js';
 import { startBrowser } from './bot_api/start_browser.js';
 import { BotClient } from './clients/bot_client.js';
 import { DiscordClient } from './clients/discord_client.js';
+import { STTTSClient } from './clients/sttts_client.js';
 import { TerminalClient } from './clients/terminal_client.js';
 import { MemoryProvider } from './memory/memory_provider.js';
 import { RedisMemory } from './memory/redis_memory_provider.js';
@@ -18,11 +20,14 @@ function createClient(
     command: string,
     botModel: BotModel,
     memory: MemoryProvider,
+    speech: SpeechApi,
     botApiHandler: CommandApi
 ): BotClient {
     switch (command) {
         case 'discord':
             return new DiscordClient(botModel, memory, botApiHandler);
+        case 'sttts':
+            return new STTTSClient(botModel, memory, speech, botApiHandler);
         default:
             return new TerminalClient(botModel, memory, botApiHandler);
     }
@@ -30,6 +35,7 @@ function createClient(
 
 const argv = await yargs(hideBin(process.argv))
     .command('terminal', 'start the bot in terminal mode')
+    .command('sttts', 'start the bot in sttts mode')
     .command('discord', 'start the bot in discord mode')
     .demandCommand(1)
     .parse();
@@ -65,11 +71,14 @@ if (settings.proxy_host != null && settings.proxy_host.length > 0) {
 }
 const browser = await startBrowser(true, proxyServerUrl);
 
+// Create the speech API
+const speech = new SpeechApi(browser);
+
 // Create the Bot API Handler
 const botApiHandler = new CommandApi(botModel, memory, browser);
 
 // Create the Bot client
-const botClient: BotClient = createClient(command, botModel, memory, botApiHandler);
+const botClient: BotClient = createClient(command, botModel, memory, speech, botApiHandler);
 
 // Normal exit
 process.on('beforeExit', async () => {

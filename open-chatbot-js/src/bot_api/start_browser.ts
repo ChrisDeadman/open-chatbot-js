@@ -37,8 +37,8 @@ export async function startBrowser(headless = true, proxyServerUrl: string | nul
         '--enable-features=NetworkService,NetworkServiceInProcess',
         '--force-color-profile=srgb',
         '--metrics-recording-only',
-        '--mute-audio',
         '--enable-automation',
+        '--enable-speech-dispatcher',
         '--remote-debugging-port=9222',
         `--disable-extensions-except=${adblock},${no_cookies}`,
         `--load-extension=${adblock},${no_cookies}`,
@@ -59,12 +59,13 @@ export async function startBrowser(headless = true, proxyServerUrl: string | nul
     const browser = await puppeteer.launch({
         headless: headless ? 'new' : false,
         timeout: 10000,
+        ignoreDefaultArgs: ['--mute-audio'],
         args: browserArgs,
     });
 
     // Give the browser extensions some time
     const [page] = await browser.pages();
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
     // Register logging callback
     page.on('console', async msg => {

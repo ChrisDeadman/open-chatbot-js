@@ -1,19 +1,19 @@
 {
-    "name": "deads-discord-bot",
+    "name": "open-chatbot-js",
     "version": "1.0.0",
-    "description": "Discord Chatbot based on ChatGPT 3.5",
+    "description": "Chatbot based on ChatGPT 3.5 or 4 with a 'sort-of' long-term memory",
     "type": "module",
-    "main": "deads-discord-bot/src/index.ts",
+    "main": "open-chatbot-js/src/index.ts",
     "directories": {
         "test": "test"
     },
     "scripts": {
-        "start": "ts-node deads-discord-bot/src/index.ts",
+        "start": "ts-node open-chatbot-js/src/index.ts",
         "test": "jest"
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/ChrisDeadman/deads-discord-bot.git"
+        "url": "git+https://github.com/ChrisDeadman/open-chatbot-js.git"
     },
     "keywords": [
         "chatbot",
@@ -22,35 +22,35 @@
     "author": "Christopher Hubmann",
     "license": "MIT",
     "bugs": {
-        "url": "https://github.com/ChrisDeadman/deads-discord-bot/issues"
+        "url": "https://github.com/ChrisDeadman/open-chatbot-js/issues"
     },
-    "homepage": "https://github.com/ChrisDeadman/deads-discord-bot#readme",
+    "homepage": "https://github.com/ChrisDeadman/open-chatbot-js#readme",
     "dependencies": {
-        "@discordjs/rest": "^1.6.0",
+        "@discordjs/rest": "^1.7.0",
         "@dqbd/tiktoken": "^1.0.6",
         "@redis/search": "^1.1.2",
         "@types/mime-types": "^2.1.1",
         "@types/node": "^18.15.11",
         "@types/yargs": "^17.0.24",
-        "bullmq": "^3.10.4",
+        "bullmq": "^3.11.0",
         "dirty-json": "^0.9.2",
-        "discord.js": "^14.8.0",
+        "discord.js": "^14.9.0",
         "mime-types": "^2.1.35",
         "node-fetch": "^3.3.1",
         "openai": "^3.2.1",
-        "puppeteer": "^19.8.2",
+        "puppeteer": "^19.9.1",
         "puppeteer-extra": "^3.3.6",
         "puppeteer-extra-plugin-stealth": "^2.11.2",
         "redis": "^4.6.5",
         "ts-node": "^10.9.1",
-        "typescript": "^5.0.3",
+        "typescript": "^5.0.4",
         "yargs": "^17.7.1"
     },
     "devDependencies": {
         "@types/jest": "^29.5.0",
-        "@typescript-eslint/eslint-plugin": "^5.57.1",
-        "@typescript-eslint/parser": "^5.57.1",
-        "eslint": "^8.37.0",
+        "@typescript-eslint/eslint-plugin": "^5.59.0",
+        "@typescript-eslint/parser": "^5.59.0",
+        "eslint": "^8.38.0",
         "jest": "^29.5.0",
         "prettier": "^2.8.7",
         "ts-jest": "^29.1.0"

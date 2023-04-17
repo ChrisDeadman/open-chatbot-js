@@ -23,13 +23,13 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
 ENV PUPPETEER_EXECUTABLE_PATH "/usr/bin/chromium-browser"
 
 # Copy package.json
-COPY deads-discord-bot/package.json ./
+COPY open-chatbot-js/package.json ./
 
 # Install npm packages
 RUN npm install --omit=dev
 
-# Copy Discord bot
-COPY deads-discord-bot/ ./
+# Copy chatbot
+COPY open-chatbot-js/ ./
 
 # Build TypeScript to JavaScript
 RUN npx tsc --project tsconfig.prod.json

@@ -1,32 +1,40 @@
-# Deads Discod Bot
+# 🤖 Open Chat Bot
 
-Discord Chatbot based on ChatGPT 3.5 with long-term memory.
+Chatbot based on ChatGPT 3.5 or 4 with a 'sort-of' long-term memory 🧠.
 
+Implements the following clients:
 
-## Build docker image
+- `terminal`: 💻 terminal based chats
+- `sttts`: 🗣️ Speech-To-Text & Text-To-Speech
+- `discord`: 🎮 a discord bot you can add to your server
 
-```
-docker build -t deads-discord-bot .
-```
+## 📦 Dependencies
 
-## Run docker image
+- **Redis with Redi🔍**: `docker run -p 6379:6379 redis/redis-stack`
+- _For rest of dependencies see `Dockerfile` 📄._
 
-**Discord Mode**:
-
-```
-docker run -it --rm --net=host -v ./config:/app/config/ deads-discord-bot discord
-```
-
-**Terminal Mode**:
+## 🛠️ Build docker image
 
 ```
-docker run -it --rm --net=host -v ./config:/app/config/ deads-discord-bot terminal
+docker build -t deads-inc/open-chatbot-js .
 ```
 
-## Dependencies
+## 🚀 Run docker image
 
-### Redis with RedisSearch
+`<mode>` is one of the implemented clients, e.g. `terminal`.
 
 ```
-docker run -p 6379:6379 redis/redis-stack
+docker run -it --rm --net=host -v ./config:/app/config/ deads-inc/open-chatbot-js <mode>
 ```
+
+## 🏗️ Build locally
+
+```
+cd ./open-chatbot-js
+npm install --omit=dev
+npx tsc --project tsconfig.prod.json
+```
+
+## ▶️ Run/Debug locally
+
+_see `.vscode/launch.json` 🐞_

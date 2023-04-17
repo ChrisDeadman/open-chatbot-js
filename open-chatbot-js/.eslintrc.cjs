@@ -1,7 +1,7 @@
 module.exports = {
     extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'],
     parser: '@typescript-eslint/parser',
-    parserOptions: { project: ['./deads-discord-bot/tsconfig.json'] },
+    parserOptions: { project: ['./open-chatbot-js/tsconfig.json'] },
     plugins: ['@typescript-eslint'],
     extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'],
     rules: {
@@ -15,5 +15,5 @@ module.exports = {
         '@typescript-eslint/no-explicit-any': 'off',
         '@typescript-eslint/explicit-module-boundary-types': 'off',
     },
-    ignorePatterns: ['src/**/*.test.ts', 'src/frontend/generated/*'],
+    ignorePatterns: ['src/**/*.test.ts', 'src/frontend/generated/*', 'dist'],
 };

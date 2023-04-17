@@ -11,7 +11,7 @@
       "runtimeExecutable": "node",
       "args": [
         "--enable-source-maps",
-        "${workspaceFolder}/deads-discord-bot/dist/src/index.js",
+        "${workspaceFolder}/open-chatbot-js/dist/src/index.js",
         "terminal"
       ],
       "env": {
@@ -33,6 +33,36 @@
       }
     },
     {
+      "name": "start:sttts",
+      "type": "node",
+      "request": "launch",
+      "protocol": "inspector",
+      "preLaunchTask": "build",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "node",
+      "args": [
+        "--enable-source-maps",
+        "${workspaceFolder}/open-chatbot-js/dist/src/index.js",
+        "sttts"
+      ],
+      "env": {
+        "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
+        "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/google-chrome-stable"
+      },
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "outputCapture": "std",
+      "internalConsoleOptions": "openOnSessionStart",
+      "skipFiles": ["<node_internals>/**"],
+      "restart": false,
+      "sourceMapPathOverrides": {
+        "webpack:///./~/*": "${webRoot}/node_modules/*",
+        "webpack:///./src/*": "${webRoot}/*"
+      }
+    },
+    {
       "name": "start:discord",
       "type": "node",
       "request": "launch",
@@ -42,7 +72,7 @@
       "runtimeExecutable": "node",
       "args": [
         "--enable-source-maps",
-        "${workspaceFolder}/deads-discord-bot/dist/src/index.js",
+        "${workspaceFolder}/open-chatbot-js/dist/src/index.js",
         "discord"
       ],
       "env": {

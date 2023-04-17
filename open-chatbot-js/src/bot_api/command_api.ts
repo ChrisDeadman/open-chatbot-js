@@ -2,6 +2,7 @@ import { Browser } from 'puppeteer';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
 import { ConversationData } from '../models/conversation_data.js';
+import { settings } from '../settings.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { BotBrowser } from './bot_browser.js';
 
@@ -29,14 +30,16 @@ export class CommandApi {
             return response;
         }
 
-        console.debug(`CMD ${command}(${JSON.stringify(args)})...`);
+        console.info(`CMD ${command}(${JSON.stringify(args)})...`);
 
         try {
             switch (command) {
                 case 'store_memory': {
                     const messages = conversation.getMessages().filter(msg => msg.role != 'system');
                     const vector = await this.botModel.createEmbedding(messages);
-                    const data = `from ${dateTimeToStr(new Date())}: ${args.data}`;
+                    const data = `from ${dateTimeToStr(new Date(), settings.locale)}: ${
+                        args.data
+                    }`;
                     if (vector.length > 0) {
                         await this.memory.add(vector, data);
                     }
@@ -72,9 +75,9 @@ export class CommandApi {
         }
 
         if (response.length > 0) {
-            console.debug(`CMD ${response.slice(0, 300)}`);
+            console.info(`CMD ${response.slice(0, 300)}`);
         } else {
-            console.debug(`CMD ${command}: OK`);
+            console.info(`CMD ${command}: OK`);
         }
 
         return response;

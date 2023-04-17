@@ -98,7 +98,7 @@ export class DiscordClient extends BotClient {
         this.initEventListeners();
 
         console.log('Logging in...');
-        this.client.login(settings.discord_bot_token);
+        await this.client.login(settings.discord_bot_token);
 
         console.log('Bot startup complete.');
     }
@@ -273,7 +273,7 @@ export class DiscordClient extends BotClient {
         }
 
         // Schedule processChannel
-        const timingVariance = Math.floor(Math.random() * settings.process_interval_ms);
+        const timingVariance = Math.floor(Math.random() * settings.chat_process_delay_ms);
         channel.processTimeout = setTimeout(async () => {
             if (channel.isProcessing == true) {
                 return;
@@ -285,7 +285,7 @@ export class DiscordClient extends BotClient {
                 channel.isProcessing = false;
                 channel.processTimeout = null;
             }
-        }, settings.process_interval_ms + timingVariance);
+        }, settings.chat_process_delay_ms + timingVariance);
     }
 
     private async sendToChannel(channel: any, message: string, chunkSize = 1000) {

@@ -5,7 +5,7 @@
       "label": "build",
       "group": "build",
       "type": "typescript",
-      "tsconfig": "deads-discord-bot/tsconfig.json",
+      "tsconfig": "open-chatbot-js/tsconfig.json",
       "problemMatcher": ["$tsc"]
     }
   ]
