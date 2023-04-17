@@ -6,6 +6,11 @@ describe('TestJsonUtils', () => {
         expect(fixAndParseJson(jsonStr)).toEqual({ name: 'Hons', age: 40, gender: 'AI' });
     });
 
+    test('test_valid_quotes_in_text', () => {
+        const jsonStr = '{"name": "Ho\'ns", "age": 40, "gender": "AI"}';
+        expect(fixAndParseJson(jsonStr)).toEqual({ name: 'Ho\'ns', age: 40, gender: 'AI' });
+    });
+
     test('test_invalid_json_just_text', () => {
         const jsonStr = 'This is just text.';
         expect(fixAndParseJson(jsonStr)).toEqual(jsonStr);

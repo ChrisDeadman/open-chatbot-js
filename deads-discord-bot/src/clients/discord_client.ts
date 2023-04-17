@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v9';
-import { BotApiHandler } from '../bot_api/bot_api_handler.js';
+import { CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
 import { ConversationData } from '../models/conversation_data.js';
@@ -24,7 +24,7 @@ export class DiscordClient extends BotClient {
     private commandArray = new Array<any>();
     private conversation: { [key: Snowflake]: ConversationData } = {};
 
-    constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: BotApiHandler) {
+    constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: CommandApi) {
         super(botModel, memory, botApiHandler);
         this.client = new Client({
             intents: [

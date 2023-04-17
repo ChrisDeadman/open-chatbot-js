@@ -1,17 +1,16 @@
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { settings } from '../settings.js';
+const __dirname = path.dirname(path.join(fileURLToPath(import.meta.url), '../'));
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-export async function startBrowser() {
-    const adblock = `${__dirname}/extensions/adblock.crx`;
-    const no_cookies = `${__dirname}/extensions/nocookie.crx`;
+export async function startBrowser(headless = true, proxyServerUrl: string | null = null) {
+    const adblock = `${__dirname}/extensions/adblock`;
+    const no_cookies = `${__dirname}/extensions/nocookie`;
     const browserArgs = [
-        '--user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36',
+        '--user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36',
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-infobars',
@@ -25,7 +24,7 @@ export async function startBrowser() {
         '--disable-accelerated-2d-canvas',
         '--disable-gpu',
         '--use-fake-ui-for-media-stream',
-        '--use-fake-device-for-media-stream--hide-scrollbars',
+        '--use-fake-device-for-media-stream',
         '--hide-scrollbars',
         '--disable-notifications',
         '--disable-background-timer-throttling',
@@ -40,22 +39,40 @@ export async function startBrowser() {
         '--metrics-recording-only',
         '--mute-audio',
         '--enable-automation',
-        '--headless=new',
         '--remote-debugging-port=9222',
-        `--disable-extensions-except=${adblock}, ${no_cookies}`,
-        `--load-extension=${adblock}`,
-        `--load-extension=${no_cookies}`,
+        `--disable-extensions-except=${adblock},${no_cookies}`,
+        `--load-extension=${adblock},${no_cookies}`,
     ];
 
-    if (settings.proxy_host != null && settings.proxy_host.length > 0) {
-        browserArgs.push(`--proxy-server=http://${settings.proxy_host}:${settings.proxy_port}`);
+    if (headless) {
+        browserArgs.push('--headless=new');
     }
 
+    if (proxyServerUrl != null) {
+        browserArgs.push(`--proxy-server=${proxyServerUrl}`);
+    }
+
+    // Stealth Mode: ACTIVATED
+    puppeteer.use(StealthPlugin());
+
+    // Launch the browser
     const browser = await puppeteer.launch({
-        headless: 'new',
+        headless: headless ? 'new' : false,
         timeout: 10000,
         args: browserArgs,
     });
-    await browser.version();
+
+    // Give the browser extensions some time
+    const [page] = await browser.pages();
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Register logging callback
+    page.on('console', async msg => {
+        const args = msg.args();
+        for (let i = 0; i < args.length; i += 1) {
+            console.log(await args[i].jsonValue());
+        }
+    });
+
     return browser;
 }

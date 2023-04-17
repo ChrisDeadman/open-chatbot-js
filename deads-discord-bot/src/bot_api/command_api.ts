@@ -4,11 +4,10 @@ import { BotModel } from '../models/bot_model.js';
 import { ConversationData } from '../models/conversation_data.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { BotBrowser } from './bot_browser.js';
-import { startBrowser } from './start_browser.js';
 
 export const DEFAULT_COMMAND_RESPONSE = 'No action performed.';
 
-export class BotApiHandler {
+export class CommandApi {
     botModel: BotModel;
     botBrowser: BotBrowser;
     memory: MemoryProvider;
@@ -19,7 +18,7 @@ export class BotApiHandler {
         this.botBrowser = new BotBrowser(botModel, browser);
     }
 
-    async handleAPIRequest(
+    async handleRequest(
         command: string,
         args: Record<string, string>,
         conversation: ConversationData
@@ -55,14 +54,12 @@ export class BotApiHandler {
                 }
                 case 'browse_website': {
                     response = `"${command}": ERROR: Your browser is broken.`;
-                    /*
                     const pageData = await this.botBrowser.getPageData(
                         args.url,
                         args.question,
                         conversation.language
                     );
                     response = `"${command}": ${pageData.summary}`;
-                    */
                     break;
                 }
                 default: {
@@ -75,16 +72,11 @@ export class BotApiHandler {
         }
 
         if (response.length > 0) {
-            console.debug(`CMD ${response.substring(0, 300)}`);
+            console.debug(`CMD ${response.slice(0, 300)}`);
         } else {
             console.debug(`CMD ${command}: OK`);
         }
 
         return response;
-    }
-
-    static async initApi(botModel: BotModel, memory: MemoryProvider): Promise<BotApiHandler> {
-        const browser = await startBrowser();
-        return new BotApiHandler(botModel, memory, browser);
     }
 }

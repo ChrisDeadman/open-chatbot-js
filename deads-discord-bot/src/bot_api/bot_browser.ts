@@ -1,4 +1,3 @@
-import { convert } from 'html-to-text';
 import { Browser, Page } from 'puppeteer';
 
 import { settings } from '../settings.js';
@@ -53,64 +52,80 @@ export class BotBrowser {
 
     private async readPage(pageData: PageData, question: string, language: string) {
         const chunkSize = 4000;
-        const proto_url = pageData.url.replace('http://', '').replace('https://', '');
+        const proto_url = pageData.url
+            .replace('http://', '')
+            .replace('https://', '')
+            .replace('file://', '');
 
         // Always use HTTP for proxys
         const url = settings.proxy_host != null ? `http://${proto_url}` : `https://${proto_url}`;
 
         try {
             // Loading the page and get the content
-            if (pageData.reload) {
-                let html = '';
+            let content = '';
 
-                // Initialize a new page
-                let page: Page | undefined;
-                try {
-                    page = await this.browser.newPage();
-                    // Ensure to dismiss all dialogs
-                    page.on('dialog', async dialog => {
-                        await dialog.dismiss();
-                    });
+            // Initialize a new page
+            let page: Page | undefined;
+            try {
+                page = await this.browser.newPage();
 
-                    // Load page contant
-                    await page.goto(url, {
-                        timeout: settings.www_timeout,
-                        waitUntil: 'domcontentloaded',
-                    });
-                    html = await page.evaluate(() => {
-                        return document.body.innerHTML;
-                    });
-                } catch (error) {
-                    pageData.summary = String(error);
-                    pageData.reload = true;
-                    pageData.done = true;
-                    return;
-                } finally {
-                    page?.close();
-                }
+                // Follow forwards
+                await page.setRequestInterception(true);
+                page.on('request', request => {
+                    request.resourceType() === 'document' ? request.continue() : request.abort();
+                });
 
-                // Convert and filter content
-                const convert_options = {
-                    wordwrap: 90,
-                    preserveNewlines: true,
-                    selectors: [{ selector: 'a.button', format: 'skip' }],
-                };
-                const content = convert(html, convert_options)
-                    .split(/\r?\n/)
-                    .filter(line => line.trim() !== '')
-                    .filter(line => !line.startsWith('[data:'))
-                    .filter(line => !line.startsWith('[') || !line.match(/\[[^\]]{100}/))
-                    .join('\n');
+                // Ensure to dismiss all dialogs
+                page.on('dialog', async dialog => {
+                    await dialog.dismiss();
+                });
 
-                // Generate content chunks
-                for (let i = 0; i < content.length; i += chunkSize) {
-                    pageData.content.push(content.slice(i, i + chunkSize));
-                }
+                // Load page content
+                await page.goto(url, {
+                    timeout: settings.www_timeout,
+                    waitUntil: 'domcontentloaded',
+                });
 
-                // Initialize summary
-                pageData.summary = 'Summary:\n\nLinks:';
-                pageData.reload = false;
+                // Select everything on the page get the selection content
+                content = await page.$eval('*', el => {
+                    let selection = window.getSelection();
+                    if (selection != null) {
+                        const range = document.createRange();
+                        range.selectNode(el);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                        selection = window.getSelection();
+                    }
+                    return selection != null ? selection.toString() : '';
+                });
+            } catch (error) {
+                pageData.summary = String(error);
+                pageData.reload = true;
+                pageData.done = true;
+                return;
+            } finally {
+                page?.close();
             }
+
+            // Generate content chunks
+            let chunkText = '';
+            content
+                .split(/\r?\n/)
+                .map(line => line.trim())
+                .forEach(line => {
+                    if (chunkText.length > 0 && chunkText.length + line.length > chunkSize) {
+                        pageData.content.push(chunkText.slice(0, chunkSize));
+                        chunkText = chunkText.slice(chunkSize);
+                    }
+                    chunkText += chunkText.length > 0 ? `\n${line}` : line;
+                });
+            if (chunkText.length > 0) {
+                pageData.content.push(chunkText.slice(0, chunkSize));
+            }
+
+            // Initialize summary
+            pageData.summary = 'Summary:\n\nLinks:';
+            pageData.reload = false;
 
             // Ask the bot model to update the summary until all content is processed
             while (pageData.content.length > 0) {

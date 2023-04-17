@@ -6,7 +6,8 @@ import { loadSettings, settings } from './settings.js';
 import { BotModel } from './models/bot_model.js';
 import { OpenAIBot } from './models/openai_bot.js';
 
-import { BotApiHandler } from './bot_api/bot_api_handler.js';
+import { CommandApi } from './bot_api/command_api.js';
+import { startBrowser } from './bot_api/start_browser.js';
 import { BotClient } from './clients/bot_client.js';
 import { DiscordClient } from './clients/discord_client.js';
 import { TerminalClient } from './clients/terminal_client.js';
@@ -17,7 +18,7 @@ function createClient(
     command: string,
     botModel: BotModel,
     memory: MemoryProvider,
-    botApiHandler: BotApiHandler
+    botApiHandler: CommandApi
 ): BotClient {
     switch (command) {
         case 'discord':
@@ -40,7 +41,12 @@ console.log('Loading settings...');
 await loadSettings('config/settings.json');
 
 // Create the memory model
-const memory = new RedisMemory(settings.redis_host, settings.redis_port, 1536, `idx:${settings.bot_name}:memory`);
+const memory = new RedisMemory(
+    settings.redis_host,
+    settings.redis_port,
+    1536,
+    `idx:${settings.bot_name}:memory`
+);
 
 // TODO: Clear always for now
 memory.clear();
@@ -52,8 +58,15 @@ const botModel: BotModel = new OpenAIBot(
     settings.openai_model
 );
 
+// Create the browser
+let proxyServerUrl;
+if (settings.proxy_host != null && settings.proxy_host.length > 0) {
+    proxyServerUrl = `http://${settings.proxy_host}:${settings.proxy_port}`;
+}
+const browser = await startBrowser(true, proxyServerUrl);
+
 // Create the Bot API Handler
-const botApiHandler = await BotApiHandler.initApi(botModel, memory);
+const botApiHandler = new CommandApi(botModel, memory, browser);
 
 // Create the Bot client
 const botClient: BotClient = createClient(command, botModel, memory, botApiHandler);

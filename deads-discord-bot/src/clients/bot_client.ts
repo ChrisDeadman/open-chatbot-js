@@ -1,4 +1,4 @@
-import { BotApiHandler } from '../bot_api/bot_api_handler.js';
+import { CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
 import { ConvMessage, ConversationData } from '../models/conversation_data.js';
@@ -9,9 +9,13 @@ import { fixAndParseJson } from '../utils/json_utils.js';
 export abstract class BotClient {
     public botModel: BotModel;
     public memory: MemoryProvider;
-    protected botApiHandler: BotApiHandler;
+    protected botApiHandler: CommandApi;
 
-    constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: BotApiHandler) {
+    constructor(
+        botModel: BotModel,
+        memory: MemoryProvider,
+        botApiHandler: CommandApi
+    ) {
         this.botModel = botModel;
         this.memory = memory;
         this.botApiHandler = botApiHandler;
@@ -66,7 +70,7 @@ export abstract class BotClient {
                 if (allowCommands && 'command' in responseData) {
                     const command = responseData.command['name'].toLowerCase();
                     const args = responseData.command['args'];
-                    const result = await this.botApiHandler.handleAPIRequest(
+                    const result = await this.botApiHandler.handleRequest(
                         command,
                         args,
                         conversation
