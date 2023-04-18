@@ -1,54 +1,18 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { settings } from '../settings.js';
 
-const __dirname = path.dirname(path.join(fileURLToPath(import.meta.url), '../'));
-
-export async function startBrowser(headless = true, proxyServerUrl: string | null = null) {
-    const adblock = `${__dirname}/extensions/adblock`;
-    const no_cookies = `${__dirname}/extensions/nocookie`;
-    const browserArgs = [
-        '--user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36',
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-infobars',
-        '--no-zygote',
-        '--no-first-run',
-        '--window-size=1280,800',
-        '--window-position=0,0',
-        '--ignore-certificate-errors',
-        '--ignore-certificate-errors-skip-list',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--use-fake-ui-for-media-stream',
-        '--use-fake-device-for-media-stream',
-        '--hide-scrollbars',
-        '--disable-notifications',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-breakpad',
-        '--disable-component-extensions-with-background-pages',
-        '--disable-features=TranslateUI,BlinkGenPropertyTrees',
-        '--disable-ipc-flooding-protection',
-        '--disable-renderer-backgrounding',
-        '--enable-features=NetworkService,NetworkServiceInProcess',
-        '--force-color-profile=srgb',
-        '--metrics-recording-only',
-        '--enable-automation',
-        '--enable-speech-dispatcher',
-        '--remote-debugging-port=9222',
-        `--disable-extensions-except=${adblock},${no_cookies}`,
-        `--load-extension=${adblock},${no_cookies}`,
-    ];
+export async function startBrowser(headless = true) {
+    const browserArgs = [...settings.browser_args];
 
     if (headless) {
         browserArgs.push('--headless=new');
     }
 
-    if (proxyServerUrl != null) {
+    let proxyServerUrl;
+    if (settings.proxy_host != null && settings.proxy_host.length > 0) {
+        proxyServerUrl = `http://${settings.proxy_host}:${settings.proxy_port}`;
         browserArgs.push(`--proxy-server=${proxyServerUrl}`);
     }
 

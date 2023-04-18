@@ -44,7 +44,7 @@ const command = typeof argv._[0] === 'string' ? argv._[0] : 'terminal';
 
 console.log('Loading settings...');
 
-await loadSettings('config/settings.json');
+await loadSettings('data/settings.json');
 
 // Create the memory model
 const memory = new RedisMemory(
@@ -65,11 +65,7 @@ const botModel: BotModel = new OpenAIBot(
 );
 
 // Create the browser
-let proxyServerUrl;
-if (settings.proxy_host != null && settings.proxy_host.length > 0) {
-    proxyServerUrl = `http://${settings.proxy_host}:${settings.proxy_port}`;
-}
-const browser = await startBrowser(true, proxyServerUrl);
+const browser = await startBrowser(true);
 
 // Create the speech API
 const speech = new SpeechApi(browser);

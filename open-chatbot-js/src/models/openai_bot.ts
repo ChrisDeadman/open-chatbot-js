@@ -150,7 +150,7 @@ export class OpenAIBot implements BotModel {
                 messages: messages.map(this.convMessageToOpenAIMessage.bind(this)),
             },
             {
-                timeout: settings.www_timeout,
+                timeout: settings.browser_timeout,
             }
         );
         const message = completion.data.choices[0].message;

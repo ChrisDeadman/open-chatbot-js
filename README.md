@@ -10,8 +10,14 @@ Implements the following clients:
 
 ## 📦 Dependencies
 
-- **Redis with Redi🔍**: `docker run -p 6379:6379 redis/redis-stack`
-- _For rest of dependencies see `Dockerfile` 📄._
+### Required
+
+- **Redis with Redi🔍**: `docker run -p 6379:6379 redis/redis-stack`.
+- 📄 Refer to [Dockerfile](Dockerfile) for OS dependencies.
+
+### Optional
+
+- **[Browser Extensions](data/browser_extensions/README.md)**.
 
 ## 🛠️ Build docker image
 
@@ -24,7 +30,7 @@ docker build -t deads-inc/open-chatbot-js .
 `<mode>` is one of the implemented clients, e.g. `terminal`.
 
 ```
-docker run -it --rm --net=host -v ./config:/app/config/ deads-inc/open-chatbot-js <mode>
+docker run -it --rm --net=host -v ./data/settings.json:/app/data/settings.json deads-inc/open-chatbot-js <mode>
 ```
 
 ## 🏗️ Build locally

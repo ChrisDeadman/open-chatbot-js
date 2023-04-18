@@ -132,4 +132,11 @@ dist
 # custom
 package-lock.json
 *.crx
-/config/settings.json
+data/*
+!data/audio/
+!data/browser_extensions/
+!data/settings.example.json
+data/audio/*
+!data/audio/README.md
+data/browser_extensions/*
+!data/browser_extensions/README.md

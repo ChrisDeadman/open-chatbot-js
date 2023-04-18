@@ -3,10 +3,16 @@
   "tasks": [
     {
       "label": "build",
-      "group": "build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
       "type": "typescript",
       "tsconfig": "open-chatbot-js/tsconfig.json",
-      "problemMatcher": ["$tsc"]
+      "problemMatcher": ["$tsc"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
     }
   ]
 }

@@ -55,7 +55,7 @@ export class BotBrowser {
         const proto_url = pageData.url
             .replace('http://', '')
             .replace('https://', '')
-            .replace('file://', '');
+            .replace('file:///', '');
 
         // Always use HTTP for proxys
         const url = settings.proxy_host != null ? `http://${proto_url}` : `https://${proto_url}`;
@@ -82,7 +82,7 @@ export class BotBrowser {
 
                 // Load page content
                 await page.goto(url, {
-                    timeout: settings.www_timeout,
+                    timeout: settings.browser_timeout,
                     waitUntil: 'domcontentloaded',
                 });
 
