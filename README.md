@@ -17,6 +17,7 @@ Implements the following clients:
 
 ### Optional
 
+- **[Audio Samples](data/audio/README.md)**.
 - **[Browser Extensions](data/browser_extensions/README.md)**.
 
 ## 🛠️ Build docker image

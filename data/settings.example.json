@@ -41,6 +41,10 @@
     "6. An AI Assistant will utilize your summary and links for further tasks.",
     "7. Take special care that the question is answered in detail the summary."
   ],
+  "audio_files": {
+    "chat_ready": "data/audio/Unphased.ogg",
+    "chat_thinking": "data/audio/Modular.ogg"
+  },
   "redis_host": "localhost",
   "redis_port": 6379,
   "proxy_host": null,
@@ -49,9 +53,9 @@
   "browser_args": [
     "--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36",
     "--no-sandbox",
+    "--no-zygote",
     "--disable-setuid-sandbox",
     "--disable-infobars",
-    "--no-zygote",
     "--no-first-run",
     "--window-size=1280,800",
     "--window-position=0,0",
@@ -62,6 +66,7 @@
     "--disable-gpu",
     "--use-fake-ui-for-media-stream",
     "--use-fake-device-for-media-stream",
+    "--autoplay-policy=no-user-gesture-required",
     "--hide-scrollbars",
     "--disable-notifications",
     "--disable-background-timer-throttling",
@@ -77,6 +82,7 @@
     "--enable-automation",
     "--enable-speech-dispatcher",
     "--remote-debugging-port=9222",
+    "--remote-debugging-pipe",
     "--disable-extensions-except=data/browser_extensions/adblock,data/browser_extensions/nocookie",
     "--load-extension=data/browser_extensions/adblock,data/browser_extensions/nocookie"
   ]

@@ -1,11 +1,20 @@
 import { Browser } from 'puppeteer';
 import { settings } from '../settings.js';
 
+import { fileToBase64 } from '../utils/conversion_utils.js';
+
+type AudioSamples = { chatReady: string; chatThinking: string };
+
 export class SpeechApi {
     browser: Browser;
+    audioSamples: AudioSamples;
 
     constructor(browser: Browser) {
         this.browser = browser;
+        this.audioSamples = {
+            chatReady: fileToBase64(settings.audio_files.chat_ready, 'audio/ogg'),
+            chatThinking: fileToBase64(settings.audio_files.chat_thinking, 'audio/ogg'),
+        };
     }
 
     async speak(text: string) {
@@ -50,10 +59,11 @@ export class SpeechApi {
         const [page] = await this.browser.pages();
 
         return page.evaluate(
-            async (triggerWord, locale, timeoutMs) => {
+            async (triggerWord, settings, audioSamples, timeoutMs) => {
                 async function listenOnPage(
                     triggerWord: string | null,
-                    locale: string,
+                    settings: any,
+                    audioSamples: AudioSamples,
                     timeoutMs: number
                 ): Promise<string> {
                     return new Promise<string>(resolve => {
@@ -88,7 +98,7 @@ export class SpeechApi {
                             // eslint-disable-next-line
                             // @ts-ignore
                             const recognizer = new webkitSpeechRecognition();
-                            recognizer.lang = locale;
+                            recognizer.lang = settings.locale;
                             recognizer.continuous = true;
                             recognizer.interimResults = true;
                             recognizer.maxAlternatives = 1;
@@ -99,7 +109,7 @@ export class SpeechApi {
                             console.log('Started listening...');
                         }
 
-                        function handleRecognitionResult(event: any): void {
+                        async function handleRecognitionResult(event: any): Promise<void> {
                             const result = event.results[event.resultIndex][0];
                             transcript = result.transcript.trim().toLowerCase() as string;
                             resetTimeout();
@@ -107,6 +117,7 @@ export class SpeechApi {
                                 if (transcript.startsWith(triggerWord)) {
                                     heardTriggerWord = true;
                                     console.log(`Heard trigger word: ${transcript}`);
+                                    await playAudioSample(audioSamples.chatReady);
                                     transcript = '';
                                 }
                             } else {
@@ -119,6 +130,7 @@ export class SpeechApi {
                                     if (isFinal && !recognitionStopped) {
                                         recognitionStopped = true;
                                         recognizer.stop();
+                                        await playAudioSample(audioSamples.chatThinking);
                                     }
                                 }
                             }
@@ -136,12 +148,25 @@ export class SpeechApi {
                                 resolve('');
                             }
                         }
+
+                        async function playAudioSample(sample: string) {
+                            try {
+                                const response = await fetch(sample);
+                                const blob = await response.blob();
+                                const audio = new Audio();
+                                audio.src = URL.createObjectURL(blob);
+                                await audio.play();
+                            } catch (error) {
+                                console.error(error);
+                            }
+                        }
                     });
                 }
-                return await listenOnPage(triggerWord, locale, timeoutMs);
+                return await listenOnPage(triggerWord, settings, audioSamples, timeoutMs);
             },
             triggerWord,
-            settings.locale,
+            settings,
+            this.audioSamples,
             timeoutMs
         );
     }

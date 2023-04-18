@@ -28,8 +28,11 @@ export async function startBrowser(headless = true) {
     });
 
     // Give the browser extensions some time
-    const [page] = await browser.pages();
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await browser.pages();
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    const pages = await browser.pages();
+    const page = pages[0];
+    pages.slice(1).forEach(async page => await page.close());
 
     // Register logging callback
     page.on('console', async msg => {
