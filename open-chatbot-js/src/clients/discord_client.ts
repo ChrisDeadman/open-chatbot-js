@@ -14,15 +14,17 @@ import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v9';
 import { CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
-import { BotModel } from '../models/bot_model.js';
-import { ConversationData } from '../models/conversation_data.js';
+import { BotModel, ConvMessage } from '../models/bot_model.js';
+import { CyclicBuffer } from '../utils/cyclic_buffer.js';
 import { BotClient } from './bot_client.js';
 
 export class DiscordClient extends BotClient {
     private client: Client;
     private commands = new Collection<string, any>();
     private commandArray = new Array<any>();
-    private conversation: { [key: Snowflake]: ConversationData } = {};
+    private conversation: {
+        [key: Snowflake]: { messages: CyclicBuffer<ConvMessage>; language: string };
+    } = {};
 
     constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: CommandApi) {
         super(botModel, memory, botApiHandler);
@@ -115,10 +117,10 @@ export class DiscordClient extends BotClient {
 
     getConversation(channelId: Snowflake) {
         if (!(channelId in this.conversation)) {
-            this.conversation[channelId] = new ConversationData(
-                settings.default_language,
-                settings.message_history_size
-            );
+            this.conversation[channelId] = {
+                messages: new CyclicBuffer<ConvMessage>(settings.message_history_size),
+                language: settings.default_language,
+            };
         }
         return this.conversation[channelId];
     }
@@ -134,13 +136,17 @@ export class DiscordClient extends BotClient {
             await this.refreshCommands();
 
             console.log('Generating status message...');
-            const conversation = new ConversationData(settings.default_language, 1);
-            conversation.addMessage({
-                role: 'system',
-                sender: 'system',
-                content: settings.status_prompt.replaceAll('$LANGUAGE', conversation.language),
-            });
-            const messages = await this.getMessages(conversation);
+            const convContext = [
+                {
+                    role: 'system',
+                    sender: 'system',
+                    content: settings.status_prompt.replaceAll(
+                        '$LANGUAGE',
+                        settings.default_language
+                    ),
+                },
+            ];
+            const messages = await this.getMessages(convContext, settings.default_language);
             const response = await this.botModel.chat(messages);
             const responseData = this.parseResponse(response);
             console.log(`Status message: ${responseData.message}`);
@@ -176,7 +182,7 @@ export class DiscordClient extends BotClient {
             const conversation = this.getConversation(message.channel.id);
 
             // Add message to the channel
-            conversation.addMessage({
+            conversation.messages.push({
                 role: 'user',
                 sender: message.author.username,
                 content: message.content,
@@ -196,7 +202,7 @@ export class DiscordClient extends BotClient {
                             const response = await fetch(attachment.url);
                             const textContent = await response.text();
                             // Add the attachment text to the channel messages
-                            conversation.addMessage({
+                            conversation.messages.push({
                                 role: 'user',
                                 sender: message.author.username,
                                 content: `file <${attachment.name}>:\n${textContent}`,
@@ -302,11 +308,6 @@ export class DiscordClient extends BotClient {
         const typingTimeoutMs = 5000;
         const conversation = this.getConversation(channel.id);
 
-        // No messages, nothing to do
-        if (conversation.isEmpty()) {
-            return;
-        }
-
         // Send typing every few seconds as long as bot is working
         let typingTimeout: NodeJS.Timeout | undefined;
         function sendTyping() {
@@ -316,7 +317,8 @@ export class DiscordClient extends BotClient {
 
         // Hand over control to bot handler - he knows best
         await this.chat(
-            conversation,
+            conversation.messages,
+            conversation.language,
             async response => {
                 await this.sendToChannel(channel, response);
             },

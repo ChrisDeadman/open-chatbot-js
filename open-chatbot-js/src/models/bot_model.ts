@@ -1,4 +1,4 @@
-import { ConvMessage } from './conversation_data.js';
+export type ConvMessage = { role: string; sender: string; content: string };
 
 export interface BotModel {
     name: string;

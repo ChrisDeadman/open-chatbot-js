@@ -3,8 +3,7 @@ import { Job, Queue, QueueEvents, Worker } from 'bullmq';
 import { ChatCompletionRequestMessageRoleEnum, Configuration, OpenAIApi } from 'openai';
 import { settings } from '../settings.js';
 import { countStringTokens } from '../utils/token_utils.js';
-import { BotModel } from './bot_model.js';
-import { ConvMessage } from './conversation_data.js';
+import { BotModel, ConvMessage } from './bot_model.js';
 
 enum JobType {
     chat = 'chat',

@@ -1,9 +1,9 @@
 import { CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
-import { BotModel } from '../models/bot_model.js';
-import { ConvMessage, ConversationData } from '../models/conversation_data.js';
+import { BotModel, ConvMessage } from '../models/bot_model.js';
 import { settings } from '../settings.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
+import { CyclicBuffer } from '../utils/cyclic_buffer.js';
 import { fixAndParseJson } from '../utils/json_utils.js';
 
 export abstract class BotClient {
@@ -22,7 +22,8 @@ export abstract class BotClient {
     abstract shutdown(): Promise<void>;
 
     protected async chat(
-        conversation: ConversationData,
+        conversation: CyclicBuffer<ConvMessage>,
+        language: string,
         handleResponse: (response: string) => Promise<void>,
         startTyping: () => void,
         stopTyping: () => void,
@@ -37,7 +38,7 @@ export abstract class BotClient {
             // chat with bot
             startTyping();
             try {
-                const messages = await this.getMessages(conversation);
+                const messages = await this.getMessages([...conversation], language);
                 response = await this.botModel.chat(messages);
             } finally {
                 stopTyping();
@@ -48,7 +49,7 @@ export abstract class BotClient {
 
             try {
                 // Store the raw bot response
-                conversation.addMessage({
+                conversation.push({
                     role: 'assistant',
                     sender: this.botModel.name,
                     content: response,
@@ -69,11 +70,12 @@ export abstract class BotClient {
                     const result = await this.botApiHandler.handleRequest(
                         command,
                         args,
-                        conversation
+                        conversation,
+                        language
                     );
                     if (result.length > 0) {
                         // Add API response to system messages
-                        conversation.addMessage({
+                        conversation.push({
                             role: 'system',
                             sender: 'system',
                             content: result,
@@ -93,7 +95,10 @@ export abstract class BotClient {
         }
     }
 
-    protected async getMessages(conversation: ConversationData): Promise<ConvMessage[]> {
+    protected async getMessages(
+        conversation: ConvMessage[],
+        language: string
+    ): Promise<ConvMessage[]> {
         const messages = [
             {
                 role: 'system',
@@ -102,12 +107,12 @@ export abstract class BotClient {
                     .join('\n')
                     .replaceAll('$BOT_NAME', this.botModel.name)
                     .replaceAll('$NOW', dateTimeToStr(new Date(), settings.locale))
-                    .replaceAll('$LANGUAGE', conversation.language),
+                    .replaceAll('$LANGUAGE', language),
             },
         ];
 
         // add memories related to the context
-        const memContext = conversation.getMessages().filter(msg => msg.role != 'system');
+        const memContext = conversation.filter(msg => msg.role != 'system');
         if (memContext.length > 0) {
             // get memories
             const vector = await this.botModel.createEmbedding(memContext);
@@ -131,15 +136,15 @@ export abstract class BotClient {
         }
 
         // add most recent messages
-        const convMessages = conversation.getMessages();
-        while (convMessages.length > 0) {
+        const convContext = [...conversation];
+        while (convContext.length > 0) {
             // as long as there are enough tokens remaining for the response
-            if (this.botModel.fits(messages.concat(convMessages), -2000)) {
-                convMessages.forEach(v => messages.push(v));
+            if (this.botModel.fits(messages.concat(convContext), -2000)) {
+                convContext.forEach(v => messages.push(v));
                 break;
             }
             // if not, remove the oldest message
-            convMessages.shift();
+            convContext.shift();
         }
 
         return messages;

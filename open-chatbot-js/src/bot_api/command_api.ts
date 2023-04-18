@@ -1,9 +1,9 @@
 import { Browser } from 'puppeteer';
 import { MemoryProvider } from '../memory/memory_provider.js';
-import { BotModel } from '../models/bot_model.js';
-import { ConversationData } from '../models/conversation_data.js';
+import { BotModel, ConvMessage } from '../models/bot_model.js';
 import { settings } from '../settings.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
+import { CyclicBuffer } from '../utils/cyclic_buffer.js';
 import { BotBrowser } from './bot_browser.js';
 
 export const DEFAULT_COMMAND_RESPONSE = 'No action performed.';
@@ -22,7 +22,8 @@ export class CommandApi {
     async handleRequest(
         command: string,
         args: Record<string, string>,
-        conversation: ConversationData
+        conversation: CyclicBuffer<ConvMessage>,
+        language: string
     ): Promise<string> {
         let response = '';
 
@@ -35,11 +36,9 @@ export class CommandApi {
         try {
             switch (command) {
                 case 'store_memory': {
-                    const messages = conversation.getMessages().filter(msg => msg.role != 'system');
+                    const messages = [...conversation].filter(msg => msg.role != 'system');
                     const vector = await this.botModel.createEmbedding(messages);
-                    const data = `from ${dateTimeToStr(new Date(), settings.locale)}: ${
-                        args.data
-                    }`;
+                    const data = `from ${dateTimeToStr(new Date(), settings.locale)}: ${args.data}`;
                     if (vector.length > 0) {
                         await this.memory.add(vector, data);
                     }
@@ -60,7 +59,7 @@ export class CommandApi {
                     const pageData = await this.botBrowser.getPageData(
                         args.url,
                         args.question,
-                        conversation.language
+                        language
                     );
                     response = `"${command}": ${pageData.summary}`;
                     break;
