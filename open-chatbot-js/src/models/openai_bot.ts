@@ -55,7 +55,7 @@ export class OpenAIBot implements BotModel {
             tokenLimit != null
                 ? tokenLimit >= 0
                     ? Math.min(tokenLimit, settings.openai_token_limit)
-                    : settings.openai_token_limit - tokenLimit
+                    : settings.openai_token_limit + tokenLimit
                 : settings.openai_token_limit;
 
         const numTokens = countStringTokens(

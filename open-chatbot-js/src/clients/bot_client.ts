@@ -126,7 +126,7 @@ export abstract class BotClient {
                     content: `Recall these stored memories:\n${memories.join('\n')}`,
                 };
                 // add memory tokens to messages if they fit
-                if (this.botModel.fits(messages.concat([memoryPrompt]), 2000)) {
+                if (this.botModel.fits(messages.concat([memoryPrompt]), 1500)) {
                     messages.push(memoryPrompt);
                     break;
                 }
@@ -139,7 +139,7 @@ export abstract class BotClient {
         const convContext = [...conversation];
         while (convContext.length > 0) {
             // as long as there are enough tokens remaining for the response
-            if (this.botModel.fits(messages.concat(convContext), -2000)) {
+            if (this.botModel.fits(messages.concat(convContext), -1000)) {
                 convContext.forEach(v => messages.push(v));
                 break;
             }

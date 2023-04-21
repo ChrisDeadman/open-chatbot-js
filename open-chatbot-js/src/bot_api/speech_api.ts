@@ -84,7 +84,7 @@ export class SpeechApi {
                         let recognitionStopped = false;
 
                         if (triggerWord != null) {
-                            triggerWord = triggerWord.trim().toLowerCase();
+                            triggerWord = triggerWord.trim().replace(' ', '').toLowerCase();
                         }
 
                         recognizer.onstart = logStartListening;
@@ -111,7 +111,10 @@ export class SpeechApi {
 
                         async function handleRecognitionResult(event: any): Promise<void> {
                             const result = event.results[event.resultIndex][0];
-                            transcript = result.transcript.trim().toLowerCase() as string;
+                            transcript = result.transcript
+                                .trim()
+                                .replace(' ', '')
+                                .toLowerCase() as string;
                             resetTimeout();
                             if (triggerWord != null && !heardTriggerWord) {
                                 if (transcript.startsWith(triggerWord)) {
