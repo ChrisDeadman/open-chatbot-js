@@ -25,6 +25,7 @@ export class DiscordClient extends BotClient {
     private conversation: {
         [key: Snowflake]: { messages: CyclicBuffer<ConvMessage>; language: string };
     } = {};
+    private typingTimeout: NodeJS.Timeout | undefined;
 
     constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: CommandApi) {
         super(botModel, memory, botApiHandler);
@@ -113,6 +114,27 @@ export class DiscordClient extends BotClient {
         await new Promise(resolve => setTimeout(resolve, 1000));
         this.client.destroy();
         console.log('Bot has been shut down.');
+    }
+
+    protected async handleResponse(channel: any, response: string, chunkSize = 1000) {
+        const numChunks = Math.ceil(response.length / chunkSize);
+
+        console.log(`[${channel.id}] ${this.botModel.name}: ${response}`);
+
+        for (let chunk = 0, idx = 0; chunk < numChunks; ++chunk, idx += chunkSize) {
+            await channel.send(response.slice(idx, idx + chunkSize));
+        }
+    }
+
+    protected startTyping(channel: any, timeoutMs = 5000): void {
+        // Send typing every few seconds as long as bot is working
+        channel.sendTyping();
+        this.typingTimeout = setTimeout(() => this.startTyping.bind(this, channel), timeoutMs);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    protected stopTyping(_channel: any): void {
+        clearTimeout(this.typingTimeout);
     }
 
     getConversation(channelId: Snowflake) {
@@ -286,44 +308,13 @@ export class DiscordClient extends BotClient {
             }
             channel.isProcessing = true;
             try {
-                await this.processChannel(channel);
+                // Chat with bot
+                const conversation = this.getConversation(channel.id);
+                await this.chat(conversation.messages, conversation.language, channel);
             } finally {
                 channel.isProcessing = false;
                 channel.processTimeout = null;
             }
         }, settings.chat_process_delay_ms + timingVariance);
-    }
-
-    private async sendToChannel(channel: any, message: string, chunkSize = 1000) {
-        const numChunks = Math.ceil(message.length / chunkSize);
-
-        console.log(`[${channel.id}] ${this.botModel.name}: ${message}`);
-
-        for (let chunk = 0, idx = 0; chunk < numChunks; ++chunk, idx += chunkSize) {
-            await channel.send(message.slice(idx, idx + chunkSize));
-        }
-    }
-
-    private async processChannel(channel: any) {
-        const typingTimeoutMs = 5000;
-        const conversation = this.getConversation(channel.id);
-
-        // Send typing every few seconds as long as bot is working
-        let typingTimeout: NodeJS.Timeout | undefined;
-        function sendTyping() {
-            channel.sendTyping();
-            typingTimeout = setTimeout(sendTyping, typingTimeoutMs);
-        }
-
-        // Hand over control to bot handler - he knows best
-        await this.chat(
-            conversation.messages,
-            conversation.language,
-            async response => {
-                await this.sendToChannel(channel, response);
-            },
-            () => sendTyping(),
-            () => clearTimeout(typingTimeout)
-        );
     }
 }

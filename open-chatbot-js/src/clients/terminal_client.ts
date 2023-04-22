@@ -37,26 +37,35 @@ export class TerminalClient extends BotClient {
         console.log('Bot has been shut down.');
     }
 
+    async handleResponse(_context: any, response: string): Promise<void> {
+        console.log(`${this.botModel.name}: ${response}`);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    startTyping(_context: any): void {
+        // nothing
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    stopTyping(_context: any): void {
+        // nothing
+    }
+
     private initEventListeners() {
         this.rlInterface.on('line', async (line: string) => {
             try {
-                // Add new message to conversation
-                this.conversation.push({
-                    role: 'user',
-                    sender: this.username,
-                    content: `${line}`,
-                });
+                line = line.trim();
+                if (line.length > 0) {
+                    // Add new message to conversation
+                    this.conversation.push({
+                        role: 'user',
+                        sender: this.username,
+                        content: `${line}`,
+                    });
 
-                // Hand over control to bot handler - he knows best
-                await this.chat(
-                    this.conversation,
-                    settings.default_language,
-                    async response => {
-                        console.log(`${this.botModel.name}: ${response}`);
-                    },
-                    () => null,
-                    () => null
-                );
+                    // Chat with bot
+                    await this.chat(this.conversation, settings.default_language);
+                }
             } catch (error) {
                 console.error(error);
             }

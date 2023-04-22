@@ -42,6 +42,21 @@ export class STTTSClient extends BotClient {
         console.log('Bot has been shut down.');
     }
 
+    async handleResponse(_context: any, response: string): Promise<void> {
+        await this.speech.speak(response);
+        console.log(`${this.botModel.name}: ${response}`);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    startTyping(_context: any): void {
+        // nothing
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    stopTyping(_context: any): void {
+        // nothing
+    }
+
     private async startWorker(): Promise<void> {
         console.log('Bot startup complete.');
         try {
@@ -63,17 +78,8 @@ export class STTTSClient extends BotClient {
                     content: `${message}`,
                 });
 
-                // Hand over control to bot handler - he knows best
-                await this.chat(
-                    this.conversation,
-                    settings.default_language,
-                    async response => {
-                        await this.speech.speak(response);
-                        console.log(`${this.botModel.name}: ${response}`);
-                    },
-                    () => null,
-                    () => null
-                );
+                // Chat with bot
+                await this.chat(this.conversation, settings.default_language);
                 this.lastMessageTime = Date.now();
             }
         } catch (error) {

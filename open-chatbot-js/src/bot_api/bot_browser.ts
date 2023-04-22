@@ -129,6 +129,8 @@ export class BotBrowser {
 
             // Ask the bot model to update the summary until all content is processed
             while (pageData.content.length > 0) {
+                // Wait a bit so messages can be sent in between the requests
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 const messages = [
                     {
                         role: 'system',

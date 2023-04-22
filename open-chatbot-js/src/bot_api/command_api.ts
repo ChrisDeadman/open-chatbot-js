@@ -42,6 +42,7 @@ export class CommandApi {
                     if (vector.length > 0) {
                         await this.memory.add(vector, data);
                     }
+                    response = 'OK';
                     break;
                 }
                 case 'delete_memory': {
@@ -52,6 +53,7 @@ export class CommandApi {
                     if (vector.length > 0) {
                         await this.memory.del(vector);
                     }
+                    response = 'OK';
                     break;
                 }
                 case 'browse_website': {
@@ -61,24 +63,19 @@ export class CommandApi {
                         args.question,
                         language
                     );
-                    response = `"${command}": ${pageData.summary}`;
+                    response = pageData.summary;
                     break;
                 }
                 default: {
-                    response = `"${command}": Invalid command.`;
+                    response = `"Invalid command.`;
                     break;
                 }
             }
         } catch (error) {
-            response = `"${command}": ${error}.`;
+            response = `"${error}.`;
         }
 
-        if (response.length > 0) {
-            console.info(`CMD ${response.slice(0, 300)}`);
-        } else {
-            console.info(`CMD ${command}: OK`);
-        }
-
-        return response;
+        console.info(`CMD ${command}: ${response.slice(0, 300)}`);
+        return response.length > 0 ? `${command}: ${response}` : '';
     }
 }

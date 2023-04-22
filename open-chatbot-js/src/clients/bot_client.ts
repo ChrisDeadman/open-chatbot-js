@@ -21,77 +21,64 @@ export abstract class BotClient {
 
     abstract shutdown(): Promise<void>;
 
+    protected abstract handleResponse(context: any, response: string): Promise<void>;
+
+    protected abstract startTyping(context: any): void;
+
+    protected abstract stopTyping(context: any): void;
+
     protected async chat(
         conversation: CyclicBuffer<ConvMessage>,
         language: string,
-        handleResponse: (response: string) => Promise<void>,
-        startTyping: () => void,
-        stopTyping: () => void,
+        context: any = null,
         allowCommands = true
     ) {
-        const maxLoops = 3;
-        let loopIdx = 0;
-        let done = false;
-        let response = '';
-
-        while (!done && loopIdx < maxLoops) {
+        // Start typing
+        this.startTyping(context);
+        try {
             // chat with bot
-            startTyping();
-            try {
-                const messages = await this.getMessages([...conversation], language);
-                response = await this.botModel.chat(messages);
-            } finally {
-                stopTyping();
+            const messages = await this.getMessages([...conversation], language);
+            const response = await this.botModel.chat(messages);
+
+            // Store the raw bot response
+            conversation.push({
+                role: 'assistant',
+                sender: this.botModel.name,
+                content: response,
+            });
+
+            // parse bot response
+            const responseData = this.parseResponse(response);
+
+            // Display message to the client
+            if (responseData.message.length > 0) {
+                await this.handleResponse(context, responseData.message);
             }
 
-            // assume we are done
-            done = true;
-
-            try {
-                // Store the raw bot response
-                conversation.push({
-                    role: 'assistant',
-                    sender: this.botModel.name,
-                    content: response,
-                });
-
-                // parse bot response
-                const responseData = this.parseResponse(response);
-
-                // Display message to the client
-                if (responseData.message.length > 0) {
-                    await handleResponse(responseData.message);
-                }
-
-                // Execute command
-                if (allowCommands && 'command' in responseData) {
-                    const command = responseData.command['name'].toLowerCase();
-                    const args = responseData.command['args'];
-                    const result = await this.botApiHandler.handleRequest(
-                        command,
-                        args,
-                        conversation,
-                        language
-                    );
-                    if (result.length > 0) {
-                        // Add API response to system messages
-                        conversation.push({
-                            role: 'system',
-                            sender: 'system',
-                            content: result,
-                        });
-
-                        // we are not done, need to return command response to bot
-                        done = false;
-                    }
-                }
-            } catch (error) {
-                // Display error to the client
-                await handleResponse(String(error));
+            // Execute command
+            if (allowCommands && 'command' in responseData) {
+                const command = responseData.command['name'].toLowerCase();
+                const args = responseData.command['args'];
+                // Do not await the result
+                this.botApiHandler
+                    .handleRequest(command, args, conversation, language)
+                    .then(result => {
+                        // Add API response to system messages when finished
+                        if (result.length > 0) {
+                            conversation.push({
+                                role: 'system',
+                                sender: 'system',
+                                content: result,
+                            });
+                        }
+                    });
             }
-
-            // keep track of the loop index
-            loopIdx += 1;
+        } catch (error) {
+            // Display error to the client
+            await this.handleResponse(context, String(error));
+        } finally {
+            // Stop typing
+            this.stopTyping(context);
         }
     }
 
