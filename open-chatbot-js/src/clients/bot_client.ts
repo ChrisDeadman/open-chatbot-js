@@ -50,28 +50,27 @@ export abstract class BotClient {
             // parse bot response
             const responseData = this.parseResponse(response);
 
+            // Execute commands
+            if (allowCommands) {
+                responseData.commands.forEach((cmd: any) => {
+                    this.botApiHandler
+                        .handleRequest(cmd.name.toLowerCase(), cmd.args, conversation, language)
+                        .then(result => {
+                            // Add API response to system messages when finished
+                            if (result.length > 0) {
+                                conversation.push({
+                                    role: 'system',
+                                    sender: 'system',
+                                    content: result,
+                                });
+                            }
+                        });
+                });
+            }
+
             // Display message to the client
             if (responseData.message.length > 0) {
                 await this.handleResponse(context, responseData.message);
-            }
-
-            // Execute command
-            if (allowCommands && 'command' in responseData) {
-                const command = responseData.command['name'].toLowerCase();
-                const args = responseData.command['args'];
-                // Do not await the result
-                this.botApiHandler
-                    .handleRequest(command, args, conversation, language)
-                    .then(result => {
-                        // Add API response to system messages when finished
-                        if (result.length > 0) {
-                            conversation.push({
-                                role: 'system',
-                                sender: 'system',
-                                content: result,
-                            });
-                        }
-                    });
             }
         } catch (error) {
             // Display error to the client
@@ -143,56 +142,84 @@ export abstract class BotClient {
         }
         console.debug(`RAW RESPONSE: ${response}`);
 
-        let responseData: any;
+        const lines = response.split('\n');
+        let commands: any[] = [];
+
+        // pick commands at the top of the response
+        while (lines.length > 0) {
+            const line = lines[0];
+            const new_cmds = this.parseCommand(line);
+            if (new_cmds.length <= 0) break;
+            lines.shift();
+            commands = commands.concat(new_cmds);
+        }
+
+        // pick commands at the bottom of the response
+        if (commands.length <= 0) {
+            while (lines.length > 0) {
+                const line = lines[lines.length - 1];
+                const new_cmds = this.parseCommand(line);
+                if (new_cmds.length <= 0) break;
+                lines.pop();
+                commands = commands.concat(new_cmds);
+            }
+        }
+
+        // rest of the response is the message
+        let message = lines.join('\n');
+
+        // Strip the botname in case it responds with it
+        const botNamePrefix = `${this.botModel.name}:`;
+        if (String(message).startsWith(botNamePrefix)) {
+            message = message.slice(botNamePrefix.length);
+        }
+
+        return { message: message, commands: commands };
+    }
+
+    private parseCommand(line: string): any[] {
+        const commands: any[] = [];
+
+        // Strip the botname in case it responds with it
+        const botNamePrefix = `${this.botModel.name}:`;
+        if (line.startsWith(botNamePrefix)) {
+            line = line.slice(botNamePrefix.length);
+        }
+
         try {
             // Fix and parse json
-            responseData = fixAndParseJson(response);
+            const responseData = fixAndParseJson(line);
 
-            // use original string if parser wrongly assumes an array of size 1
-            if (Array.isArray(responseData) && responseData.length < 2) {
-                responseData = response;
+            // Not a command response
+            if (typeof responseData === 'string') {
+                return commands;
             }
 
             // Combine multiple responses
             if (Array.isArray(responseData)) {
                 const responseDataArr = responseData;
-                responseData = { message: '' };
                 responseDataArr.forEach(r => {
-                    if ('message' in r) {
-                        responseData.message += r.message;
-                    }
                     if ('command' in r) {
-                        if (r.command['name'] != 'nop') {
-                            responseData['command'] = r.command;
+                        const cmd = { name: r.command, args: {} };
+                        if ('args' in r) {
+                            cmd.args = r.args;
                         }
+                        commands.push(cmd);
                     }
                 });
             }
 
-            // Account for non-json response
-            if (typeof responseData === 'string') {
-                responseData = { message: responseData };
+            if ('command' in responseData) {
+                const cmd = { name: responseData.command, args: {} };
+                if ('args' in responseData) {
+                    cmd.args = responseData.args;
+                }
+                commands.push(cmd);
             }
         } catch (error) {
-            responseData = { message: response };
+            // ignore
         }
 
-        // Bot might omit message field
-        if (!('message' in responseData)) {
-            responseData['message'] = '';
-        }
-
-        // Bot might omit command field
-        if (!('command' in responseData)) {
-            responseData['command'] = { name: 'nop', args: {} };
-        }
-
-        // Strip the botname in case it responds with it
-        const botNamePrefix = `${this.botModel.name}: `;
-        if (String(responseData.message).startsWith(botNamePrefix)) {
-            responseData.message = responseData.message.slice(botNamePrefix.length);
-        }
-
-        return responseData;
+        return commands;
     }
 }
