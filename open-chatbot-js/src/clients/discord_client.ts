@@ -129,7 +129,7 @@ export class DiscordClient extends BotClient {
     protected startTyping(channel: any, timeoutMs = 5000): void {
         // Send typing every few seconds as long as bot is working
         channel.sendTyping();
-        this.typingTimeout = setTimeout(() => this.startTyping.bind(this, channel), timeoutMs);
+        this.typingTimeout = setTimeout(() => this.startTyping(channel), timeoutMs);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
