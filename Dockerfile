@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install required packages
 RUN apk update && \
-    apk --no-cache add bash chromium g++ git make python3-dev py3-pip ttf-freefont udev unzip vips-dev wget && \
+    apk --no-cache add bash chromium g++ git make python3-dev py3-flask py3-numpy py3-pip py3-yaml ttf-freefont udev unzip vips-dev wget && \
     rm -rf /var/cache/apk/* && \
     rm -rf /usr/share/man && \
     rm -rf /tmp/*
@@ -33,15 +33,27 @@ COPY open-chatbot-js/package.json ./
 # Install npm packages
 RUN npm install --omit=dev
 
+# Copy requirements.txt
+COPY gpt4all-rest/requirements.txt ./
+
+# Install pip dependencies
+RUN pip install --no-cache-dir -r ./requirements.txt && \
+    rm -rf /tmp/*
+
 # Copy chatbot
 COPY open-chatbot-js/ ./
 
 # Build TypeScript to JavaScript
 RUN npx tsc --project tsconfig.prod.json
 
+# Copy gpt4all-rest
+COPY gpt4all-rest/src/ ./gpt4all-rest
+
 # Copy Startup script
 COPY startup.sh ./
 
 VOLUME [ "/app/data/settings.json" ]
+
+VOLUME [ "/app/data/models" ]
 
 ENTRYPOINT [ "sh" , "/app/startup.sh" ]

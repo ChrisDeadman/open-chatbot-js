@@ -130,13 +130,17 @@ dist
 .pnp.*
 
 # custom
+.venv/
 package-lock.json
 *.crx
 data/*
 !data/audio/
 !data/browser_extensions/
-!data/settings.example.json
+!data/models/
+!data/settings.example.*.json
 data/audio/*
 !data/audio/README.md
 data/browser_extensions/*
 !data/browser_extensions/README.md
+data/models/*
+!data/models/README.md

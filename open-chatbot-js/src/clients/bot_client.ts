@@ -41,11 +41,13 @@ export abstract class BotClient {
             const response = await this.botModel.chat(messages);
 
             // Store the raw bot response
-            conversation.push({
-                role: 'assistant',
-                sender: this.botModel.name,
-                content: response,
-            });
+            if (response.length > 0) {
+                conversation.push({
+                    role: 'assistant',
+                    sender: this.botModel.name,
+                    content: response,
+                });
+            }
 
             // parse bot response
             const responseData = this.parseResponse(response);
@@ -85,17 +87,22 @@ export abstract class BotClient {
         conversation: ConvMessage[],
         language: string
     ): Promise<ConvMessage[]> {
-        const messages = [
-            {
+        const messages = [];
+
+        const initial_prompt = settings.initial_prompt
+            .join('\n')
+            .replaceAll('$BOT_NAME', this.botModel.name)
+            .replaceAll('$NOW', dateTimeToStr(new Date(), settings.locale))
+            .replaceAll('$LANGUAGE', language);
+
+        // add initial prompt to the context
+        if (initial_prompt.length >= 0) {
+            messages.push({
                 role: 'system',
                 sender: 'system',
-                content: settings.initial_prompt
-                    .join('\n')
-                    .replaceAll('$BOT_NAME', this.botModel.name)
-                    .replaceAll('$NOW', dateTimeToStr(new Date(), settings.locale))
-                    .replaceAll('$LANGUAGE', language),
-            },
-        ];
+                content: initial_prompt,
+            });
+        }
 
         // add memories related to the context
         const memContext = conversation.filter(msg => msg.role != 'system');

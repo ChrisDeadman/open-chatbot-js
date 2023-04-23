@@ -17,21 +17,24 @@ Implements the following clients:
 
 ### Optional
 
+- **[GPT4All Models](data/models/README.md)**.
 - **[Audio Samples](data/audio/README.md)**.
 - **[Browser Extensions](data/browser_extensions/README.md)**.
 
-## 🛠️ Build docker image
+## 🛠️ Configuration
+
+Copy an example configuration from `data/settings.example.*.json` to `data/settings.json`.
+
+## 🚀 Build and run docker image
 
 ```
 docker build -t deads-inc/open-chatbot-js .
 ```
 
-## 🚀 Run docker image
-
 `<mode>` is one of the implemented clients, e.g. `terminal`.
 
 ```
-docker run -it --rm --net=host -v ./data/settings.json:/app/data/settings.json deads-inc/open-chatbot-js <mode>
+docker run -it --rm --net=host -v ./data/settings.json:/app/data/settings.json -v ./data/models:/app/data/models deads-inc/open-chatbot-js <mode>
 ```
 
 ## 🏗️ Build locally
@@ -42,6 +45,6 @@ npm install --omit=dev
 npx tsc --project tsconfig.prod.json
 ```
 
-## ▶️ Run/Debug locally
+## 🐞 Run/Debug locally
 
-_see `.vscode/launch.json` 🐞_
+_see [launch.json](.vscode/launch.json)_

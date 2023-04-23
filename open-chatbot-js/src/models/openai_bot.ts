@@ -45,7 +45,7 @@ export class OpenAIBot implements BotModel {
             },
             limiter: {
                 max: 1,
-                duration: settings.openai_rate_limit_ms,
+                duration: settings.bot_model_rate_limit_ms,
             },
         });
     }
@@ -54,9 +54,9 @@ export class OpenAIBot implements BotModel {
         const limit =
             tokenLimit != null
                 ? tokenLimit >= 0
-                    ? Math.min(tokenLimit, settings.openai_token_limit)
-                    : settings.openai_token_limit + tokenLimit
-                : settings.openai_token_limit;
+                    ? Math.min(tokenLimit, settings.bot_model_token_limit)
+                    : settings.bot_model_token_limit + tokenLimit
+                : settings.bot_model_token_limit;
 
         const numTokens = countStringTokens(
             messages
@@ -87,9 +87,9 @@ export class OpenAIBot implements BotModel {
                 messages
                     .map(this.convMessageToOpenAIMessage.bind(this))
                     .map(message => message.content),
-                settings.openai_embedding_model
+                settings.embedding_model
             );
-            if (numTokens <= settings.openai_token_limit) {
+            if (numTokens <= settings.bot_model_token_limit) {
                 break;
             }
         }
@@ -128,14 +128,14 @@ export class OpenAIBot implements BotModel {
             const endTime = Date.now();
             const elapsedMs = endTime - startTime;
             console.debug(`OpenAI: response received after ${elapsedMs}ms`);
-            this.worker.rateLimit(settings.openai_rate_limit_ms);
+            this.worker.rateLimit(settings.bot_model_rate_limit_ms);
         } catch (error) {
             console.error(`OpenAI: ${error}`);
             if (axios.isAxiosError(error)) {
                 // Obey OpenAI rate limit or retry on timeout
                 const status = error.response?.status;
                 if (status === undefined || status == 429) {
-                    this.worker.rateLimit(settings.openai_rate_limit_ms);
+                    this.worker.rateLimit(settings.bot_model_rate_limit_ms);
                     throw Worker.RateLimitError();
                 }
             }
@@ -161,7 +161,7 @@ export class OpenAIBot implements BotModel {
         const input = messages.map(msg => msg.content).join('\n');
         const result = await this.openai.createEmbedding({
             input: input,
-            model: settings.openai_embedding_model,
+            model: settings.embedding_model,
         });
         return result.data.data[0].embedding;
     }

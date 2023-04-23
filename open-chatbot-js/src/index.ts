@@ -4,6 +4,7 @@ import yargs from 'yargs/yargs';
 import { loadSettings, settings } from './settings.js';
 
 import { BotModel } from './models/bot_model.js';
+import { GPT4AllBot } from './models/gpt4all_bot.js';
 import { OpenAIBot } from './models/openai_bot.js';
 
 import { CommandApi } from './bot_api/command_api.js';
@@ -58,11 +59,12 @@ const memory = new RedisMemory(
 memory.clear();
 
 // Create the Bot model
-const botModel: BotModel = new OpenAIBot(
-    settings.bot_name,
-    settings.openai_api_key,
-    settings.openai_model
-);
+let botModel: BotModel;
+if (settings.bot_backend === 'gpt4all') {
+    botModel = new GPT4AllBot(settings.bot_name, settings.bot_model);
+} else {
+    botModel = new OpenAIBot(settings.bot_name, settings.openai_api_key, settings.bot_model);
+}
 
 // Create the browser
 const browser = await startBrowser(true);
