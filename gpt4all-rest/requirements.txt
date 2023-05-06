@@ -1,3 +1,0 @@
-pyllamacpp
-langchain
-Flask

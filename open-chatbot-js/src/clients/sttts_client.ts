@@ -23,7 +23,7 @@ export class STTTSClient extends BotClient {
         memory: MemoryProvider,
         speech: SpeechApi,
         botApiHandler: CommandApi,
-        username = 'Developer'
+        username = 'You'
     ) {
         super(botModel, memory, botApiHandler);
         this.speech = speech;

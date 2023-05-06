@@ -4,8 +4,8 @@ import yargs from 'yargs/yargs';
 import { loadSettings, settings } from './settings.js';
 
 import { BotModel } from './models/bot_model.js';
-import { GPT4AllBot } from './models/gpt4all_bot.js';
 import { OpenAIBot } from './models/openai_bot.js';
+import { WebUIBot } from './models/webui_bot.js';
 
 import { CommandApi } from './bot_api/command_api.js';
 import { SpeechApi } from './bot_api/speech_api.js';
@@ -60,10 +60,10 @@ memory.clear();
 
 // Create the Bot model
 let botModel: BotModel;
-if (settings.bot_backend === 'gpt4all') {
-    botModel = new GPT4AllBot(settings.bot_name, settings.bot_model);
-} else {
+if (settings.bot_backend === 'openai') {
     botModel = new OpenAIBot(settings.bot_name, settings.openai_api_key, settings.bot_model);
+} else {
+    botModel = new WebUIBot(settings.bot_name, settings.bot_backend);
 }
 
 // Create the browser

@@ -16,7 +16,7 @@ export class TerminalClient extends BotClient {
         botModel: BotModel,
         memory: MemoryProvider,
         botApiHandler: CommandApi,
-        username = 'Developer'
+        username = 'You'
     ) {
         super(botModel, memory, botApiHandler);
         this.username = username;

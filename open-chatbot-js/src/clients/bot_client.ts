@@ -133,7 +133,7 @@ export abstract class BotClient {
         while (convContext.length > 0) {
             // as long as there are enough tokens remaining for the response
             if (this.botModel.fits(messages.concat(convContext), -1000)) {
-                convContext.forEach(v => messages.push(v));
+                convContext.forEach(m => messages.push(m));
                 break;
             }
             // if not, remove the oldest message
@@ -147,7 +147,7 @@ export abstract class BotClient {
         if (response.length <= 0) {
             throw new Error('No response received.');
         }
-        console.debug(`RAW RESPONSE: ${response}`);
+        // console.debug(`RAW RESPONSE: ${response}`);
 
         const lines = response.split('\n');
         let commands: any[] = [];

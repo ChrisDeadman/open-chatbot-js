@@ -1,6 +1,6 @@
 # 🤖 Open Chat Bot
 
-Chatbot based on ChatGPT 3.5 or 4 with a 'sort-of' long-term memory 🧠.
+Chatbot with a 'sort-of' long-term memory 🧠 with [Text generation web UI](https://github.com/oobabooga/text-generation-webui) and ChatGPT backend.
 
 Implements the following clients:
 
@@ -14,14 +14,17 @@ Implements the following clients:
 
 - **Redis with Redi🔍**: `docker run -p 6379:6379 redis/redis-stack`.
 - 📄 Refer to [Dockerfile](Dockerfile) for OS dependencies.
+- **[Text generation web UI](https://github.com/oobabooga/text-generation-webui)** or an OpenAI API key.
 
 ### Optional
 
-- **[GPT4All Models](data/models/README.md)**.
 - **[Audio Samples](data/audio/README.md)**.
 - **[Browser Extensions](data/browser_extensions/README.md)**.
 
 ## 🛠️ Configuration
+
+- **[Text generation web UI Example](data/settings.example.webui.json)**
+- **[OpenAI Example](data/settings.example.openai.json)**
 
 Copy an example configuration from `data/settings.example.*.json` to `data/settings.json`.
 
@@ -34,7 +37,7 @@ docker build -t deads-inc/open-chatbot-js .
 `<mode>` is one of the implemented clients, e.g. `terminal`.
 
 ```
-docker run -it --rm --net=host -v ./data/settings.json:/app/data/settings.json -v ./data/models:/app/data/models deads-inc/open-chatbot-js <mode>
+docker run -it --rm --net=host -v ./data/settings.json:/app/data/settings.json -v deads-inc/open-chatbot-js <mode>
 ```
 
 ## 🏗️ Build locally

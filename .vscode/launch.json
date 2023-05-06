@@ -91,14 +91,6 @@
         "webpack:///./~/*": "${webRoot}/node_modules/*",
         "webpack:///./src/*": "${webRoot}/*"
       }
-    },
-    {
-      "name": "Launch gpt4all",
-      "type": "python",
-      "request": "launch",
-      "program": "${workspaceFolder}/gpt4all-rest/src/gpt4all-rest.py",
-      "console": "integratedTerminal",
-      "justMyCode": false
     }
   ]
 }
