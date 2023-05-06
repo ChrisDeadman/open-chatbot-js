@@ -66,9 +66,10 @@ export class WebUIBot implements BotModel {
             );
 
             const senders = Array.from(new Set(messages.map(message => message.sender))).join(':|');
-            const regex = new RegExp(`((<START|You:|${senders}:).*)`, 'g');
-            const endRegex = new RegExp(`((<|>|You|${this.name})+[:]*\\s*$)`, 'g');
+            const regex = new RegExp(`(<START|You:|${senders}:).*`, 'gi');
+            const endRegex = new RegExp(`(<|>|You|${this.name})+[:]*\\s*$`, 'gi');
             return String(completion.data.results[0].text)
+                .replace(`${this.name}:}`, '')
                 .replace(regex, '')
                 .trim()
                 .replace(endRegex, '')

@@ -39,13 +39,19 @@ const argv = await yargs(hideBin(process.argv))
     .command('sttts', 'start the bot in sttts mode')
     .command('discord', 'start the bot in discord mode')
     .demandCommand(1)
+    .option('settings', {
+        alias: 's',
+        type: 'string',
+        description: 'Path to the config file',
+        default: 'data/settings.json',
+    })
     .parse();
 
 const command = typeof argv._[0] === 'string' ? argv._[0] : 'terminal';
 
 console.log('Loading settings...');
 
-await loadSettings('data/settings.json');
+await loadSettings(argv.settings);
 
 // Create the memory model
 const memory = new RedisMemory(
