@@ -70,21 +70,23 @@ export abstract class BotClient {
 
             // Execute commands
             if (allowCommands && responseData.commands.length > 0) {
-                const cmd_list_str = responseData.commands.map((cmd: any) => cmd.name).join(',');
-                responseData.message = `*(${cmd_list_str})* ${responseData.message}`;
-                responseData.commands.forEach((cmd: any) => {
-                    this.botApiHandler
-                        .handleRequest(cmd.name.toLowerCase(), cmd.args, memory_vector, language)
-                        .then(result => {
-                            // Add API response to system messages when finished
-                            if (result.length > 0) {
-                                conversation.push({
-                                    role: 'system',
-                                    sender: 'system',
-                                    content: result,
-                                });
-                            }
-                        });
+                if (responseData.message.trim().length > 0) {
+                    const cmd_list_str = Array.from(
+                        new Set(responseData.commands.map((cmd: any) => cmd.command))
+                    ).map(cmd => `\`${cmd}\``).join(' ');
+                    responseData.message = `${cmd_list_str} ${responseData.message}`;
+                }
+                responseData.commands.forEach((cmd: Record<string, string>) => {
+                    this.botApiHandler.handleRequest(cmd, memory_vector, language).then(result => {
+                        // Add API response to system messages when finished
+                        if (result.length > 0) {
+                            conversation.push({
+                                role: 'system',
+                                sender: 'system',
+                                content: result,
+                            });
+                        }
+                    });
                 });
             }
 
@@ -106,7 +108,7 @@ export abstract class BotClient {
         memory_vector: number[],
         language: string
     ): Promise<ConvMessage[]> {
-        const messages = [];
+        const messages: ConvMessage[] = [];
 
         const initial_prompt = settings.initial_prompt
             .join('\n')
@@ -125,18 +127,17 @@ export abstract class BotClient {
 
         if (memory_vector.length > 0) {
             // get memories related to the memory vector
-            const memories = await this.memory.get(memory_vector, 10);
+            const memories = (await this.memory.get(memory_vector, 10)).map(m => ({
+                role: 'system',
+                sender: 'system',
+                content: m,
+            }));
 
             // add limited amount of memories
             while (memories.length > 0) {
-                const memoryPrompt = {
-                    role: 'system',
-                    sender: 'system',
-                    content: `Recall these stored memories:\n${memories.join('\n')}`,
-                };
                 // add memory tokens to messages if they fit
-                if (this.botModel.fits(messages.concat([memoryPrompt]), 1500)) {
-                    messages.push(memoryPrompt);
+                if (this.botModel.fits(messages.concat(memories), 1500)) {
+                    memories.forEach(m => messages.push(m));
                     break;
                 }
                 // if not, remove another memory and try again
@@ -148,7 +149,7 @@ export abstract class BotClient {
         const convContext = [...conversation];
         while (convContext.length > 0) {
             // as long as there are enough tokens remaining for the response
-            if (this.botModel.fits(messages.concat(convContext), -1000)) {
+            if (this.botModel.fits(messages.concat(convContext), -512)) {
                 convContext.forEach(m => messages.push(m));
                 break;
             }
@@ -168,27 +169,18 @@ export abstract class BotClient {
         const lines = response.split('\n');
         let commands: any[] = [];
 
-        // pick commands at the top of the response
-        while (lines.length > 0) {
-            const line = lines[0];
+        // check each response line for commands
+        for (let i=0; i < lines.length; i+= 1) {
+            const line = lines[i];
             const new_cmds = this.parseCommand(line);
-            if (new_cmds.length <= 0) break;
-            lines.shift();
-            commands = commands.concat(new_cmds);
-        }
-
-        // pick commands at the bottom of the response
-        if (commands.length <= 0) {
-            while (lines.length > 0) {
-                const line = lines[lines.length - 1];
-                const new_cmds = this.parseCommand(line);
-                if (new_cmds.length <= 0) break;
-                lines.pop();
+            if (new_cmds.length > 0) {
                 commands = commands.concat(new_cmds);
+                lines.splice(i, 1)
+                i -= 1
             }
         }
 
-        // rest of the response is the message
+        // remaining response is the message
         let message = lines.join('\n');
 
         // Strip the botname in case it responds with it
@@ -200,8 +192,8 @@ export abstract class BotClient {
         return { message: message, commands: commands };
     }
 
-    private parseCommand(line: string): any[] {
-        const commands: any[] = [];
+    private parseCommand(line: string): Record<string, string>[] {
+        const commands: Record<string, string>[] = [];
 
         // Strip the botname in case it responds with it
         const botNamePrefix = `${this.botModel.name}:`;
@@ -211,7 +203,7 @@ export abstract class BotClient {
 
         try {
             // Fix and parse json
-            const responseData = fixAndParseJson(line);
+            let responseData = fixAndParseJson(line);
 
             // Not a command response
             if (typeof responseData === 'string') {
@@ -219,26 +211,14 @@ export abstract class BotClient {
             }
 
             // Combine multiple responses
-            if (Array.isArray(responseData)) {
-                const responseDataArr = responseData;
-                responseDataArr.forEach(r => {
-                    if ('command' in r) {
-                        const cmd = { name: r.command, args: {} };
-                        if ('args' in r) {
-                            cmd.args = r.args;
-                        }
-                        commands.push(cmd);
-                    }
-                });
+            if (!Array.isArray(responseData)) {
+                responseData = [responseData];
             }
-
-            if ('command' in responseData) {
-                const cmd = { name: responseData.command, args: {} };
-                if ('args' in responseData) {
-                    cmd.args = responseData.args;
+            responseData.forEach((r: Record<string, string>) => {
+                if ('command' in r) {
+                    commands.push(r);
                 }
-                commands.push(cmd);
-            }
+            });
         } catch (error) {
             // ignore
         }

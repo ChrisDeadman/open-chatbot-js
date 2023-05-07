@@ -36,22 +36,25 @@ export class BotBrowser {
             this.pages[language] = {};
         }
         const pageDict = this.pages[language];
-        if (!(url in pageDict)) {
-            pageDict[url] = new PageData(url);
+        if (!(url + question in pageDict)) {
+            pageDict[url + question] = new PageData(url);
         }
-        const page = pageDict[url];
-        page.lastAccessed = Date.now();
-        // load pages that are flagged for loading
-        if (page.reload) {
+        const page = pageDict[url + question];
+
+        // read pages that need (re-)loading
+        if (page.reload || this.isOutdated(page)) {
+            page.reload = false;
             const readPagePromise = this.readPage(page, question, language);
             this.prunePages(pageDict);
             await readPagePromise;
         }
+
+        page.lastAccessed = Date.now();
         return page;
     }
 
     private async readPage(pageData: PageData, question: string, language: string) {
-        const chunkSize = 4000;
+        const chunkSize = settings.bot_model_token_limit - 512;
         const proto_url = pageData.url
             .replace('http://', '')
             .replace('https://', '')
@@ -100,7 +103,6 @@ export class BotBrowser {
                 });
             } catch (error) {
                 pageData.summary = String(error);
-                pageData.reload = true;
                 pageData.done = true;
                 return;
             } finally {
@@ -124,8 +126,7 @@ export class BotBrowser {
             }
 
             // Initialize summary
-            pageData.summary = 'Summary:\n\nLinks:';
-            pageData.reload = false;
+            pageData.summary = '';
 
             // Ask the bot model to update the summary until all content is processed
             while (pageData.content.length > 0) {
@@ -137,36 +138,53 @@ export class BotBrowser {
                         sender: 'system',
                         content: settings.bot_browser_prompt
                             .join('\n')
+                            .replaceAll('$BOT_NAME', this.botModel.name)
                             .replaceAll('$QUESTION', question)
                             .replaceAll('$LANGUAGE', language),
                     },
                     {
                         role: 'system',
                         sender: 'system',
-                        content: `${pageData.summary}\n\nContent:\n${pageData.content.shift()}`,
+                        content: `Summary:\n${pageData.summary}`,
+                    },
+                    {
+                        role: 'system',
+                        sender: 'system',
+                        content: `Content:\n${pageData.content.shift()}`,
                     },
                 ];
-                pageData.summary = await this.botModel.chat(messages);
+                pageData.summary = (await this.botModel.chat(messages))
+                    .replaceAll('Summary:', '')
+                    .replaceAll('Content:', '')
+                    .trim();
             }
 
             // Update status
             pageData.done = true;
+            pageData.reload = pageData.summary.trim().length <= 0;
         } catch (error) {
             pageData.summary = String(error);
-            pageData.reload = false;
+            pageData.reload = true;
             pageData.done = true;
         }
     }
 
     /**
-     * Remove pages older than 30 minutes
+     * Returns true for pages older than 30 minutes
+     */
+    private isOutdated(pageData: PageData): boolean {
+        const now = Date.now();
+        return now - pageData.lastAccessed > 30 * 60 * 1000;
+    }
+
+    /**
+     * Remove old pages
      */
     private prunePages(pageDict: { [key: string]: PageData }) {
-        const now = Date.now();
         for (const url in pageDict) {
             const pageData = pageDict[url];
             if (pageData.done) {
-                if (now - pageData.lastAccessed > 30 * 60 * 1000) {
+                if (this.isOutdated(pageData)) {
                     delete pageDict[url];
                 }
             }

@@ -48,7 +48,7 @@ export function fixAndParseJson(jsonStr: string): any {
     }
 
     // split json object lines
-    jsonStr = jsonStr.replace(/}\s*{/g, "}\n{")
+    jsonStr = jsonStr.replace(/}\s*[,]*\s*{/g, "}\n{")
 
     // initial json correction
     jsonStr = correctJson(jsonStr);

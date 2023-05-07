@@ -34,23 +34,24 @@ export class CommandApi {
     }
 
     async handleRequest(
-        command: string,
-        args: Record<string, string>,
+        command_args: Record<string, string>,
         memory_vector: number[],
         language: string
     ): Promise<string> {
         let response = '';
 
-        if (command.length < 0 || command === Command.Nop) {
+        if (command_args.command.length <= 0 || command_args.command === Command.Nop) {
             return response;
         }
 
-        console.info(`CMD ${command}(${JSON.stringify(args)})...`);
+        console.info(`CMD ${JSON.stringify(command_args)}`);
 
         try {
-            switch (command) {
+            switch (command_args.command) {
                 case Command.StoreMemory: {
-                    const data = `from ${dateTimeToStr(new Date(), settings.locale)}: ${args.data}`;
+                    const data = `from ${dateTimeToStr(new Date(), settings.locale)}: ${
+                        command_args.data
+                    }`;
                     if (memory_vector.length > 0) {
                         await this.memory.add(memory_vector, data);
                     }
@@ -58,7 +59,11 @@ export class CommandApi {
                 }
                 case Command.DeleteMemory: {
                     const messages = [
-                        { role: 'assistant', sender: this.botModel.name, content: args.data },
+                        {
+                            role: 'assistant',
+                            sender: this.botModel.name,
+                            content: command_args.data,
+                        },
                     ];
                     const vector = await this.embeddingModel.createEmbedding(messages);
                     if (vector.length > 0) {
@@ -67,17 +72,17 @@ export class CommandApi {
                     break;
                 }
                 case Command.BrowseWebsite: {
-                    response = `"${command}": ERROR: Your browser is broken.`;
+                    response = 'ERROR: Your browser is broken.';
                     const pageData = await this.botBrowser.getPageData(
-                        args.url,
-                        args.question,
+                        command_args.url,
+                        command_args.question,
                         language
                     );
                     response = pageData.summary;
                     break;
                 }
                 default: {
-                    response = "Invalid command.";
+                    response = 'Invalid command.';
                     break;
                 }
             }
@@ -85,7 +90,11 @@ export class CommandApi {
             response = `"${error}.`;
         }
 
-        console.info(`CMD ${command}: ${response.slice(0, 300)}`);
-        return response.length > 0 ? `${command}: ${response}` : '';
+        if (response.length > 0) {
+            console.info(`CMD ${command_args.command}: ${response.slice(0, 300)}`);
+            response = `${command_args.command}: ${response}`;
+        }
+
+        return response;
     }
 }
