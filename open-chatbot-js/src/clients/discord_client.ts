@@ -14,7 +14,9 @@ import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v9';
 import { CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
-import { BotModel, ConvMessage } from '../models/bot_model.js';
+import { BotModel } from '../models/bot_model.js';
+import { ConvMessage } from '../models/conv_message.js';
+import { EmbeddingModel } from '../models/embedding_model.js';
 import { CyclicBuffer } from '../utils/cyclic_buffer.js';
 import { BotClient } from './bot_client.js';
 
@@ -27,8 +29,13 @@ export class DiscordClient extends BotClient {
     } = {};
     private typingTimeout: NodeJS.Timeout | undefined;
 
-    constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: CommandApi) {
-        super(botModel, memory, botApiHandler);
+    constructor(
+        botModel: BotModel,
+        embeddingModel: EmbeddingModel,
+        memory: MemoryProvider,
+        botApiHandler: CommandApi
+    ) {
+        super(botModel, embeddingModel, memory, botApiHandler);
         this.client = new Client({
             intents: [
                 GatewayIntentBits.Guilds,
@@ -168,7 +175,7 @@ export class DiscordClient extends BotClient {
                     ),
                 },
             ];
-            const messages = await this.getMessages(convContext, settings.default_language);
+            const messages = await this.getMessages(convContext, [], settings.default_language);
             const response = await this.botModel.chat(messages);
             const responseData = this.parseResponse(response);
             console.log(`Status message: ${responseData.message}`);

@@ -1,6 +1,8 @@
 import { CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
-import { BotModel, ConvMessage } from '../models/bot_model.js';
+import { BotModel } from '../models/bot_model.js';
+import { ConvMessage } from '../models/conv_message.js';
+import { EmbeddingModel } from '../models/embedding_model.js';
 import { settings } from '../settings.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { CyclicBuffer } from '../utils/cyclic_buffer.js';
@@ -8,11 +10,18 @@ import { fixAndParseJson } from '../utils/json_utils.js';
 
 export abstract class BotClient {
     public botModel: BotModel;
+    public embeddingModel: EmbeddingModel;
     public memory: MemoryProvider;
     protected botApiHandler: CommandApi;
 
-    constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: CommandApi) {
+    constructor(
+        botModel: BotModel,
+        embeddingModel: EmbeddingModel,
+        memory: MemoryProvider,
+        botApiHandler: CommandApi
+    ) {
         this.botModel = botModel;
+        this.embeddingModel = embeddingModel;
         this.memory = memory;
         this.botApiHandler = botApiHandler;
     }
@@ -33,11 +42,18 @@ export abstract class BotClient {
         context: any = null,
         allowCommands = true
     ) {
+        const conv_list = [...conversation];
+
         // Start typing
         this.startTyping(context);
         try {
+            // get memory vector related to conversation context
+            const memContext = conv_list.filter(msg => msg.role != 'system');
+            const memory_vector =
+                memContext.length > 0 ? await this.embeddingModel.createEmbedding(memContext) : [];
+
             // chat with bot
-            const messages = await this.getMessages([...conversation], language);
+            const messages = await this.getMessages(conv_list, memory_vector, language);
             const response = await this.botModel.chat(messages);
 
             // Store the raw bot response
@@ -53,10 +69,12 @@ export abstract class BotClient {
             const responseData = this.parseResponse(response);
 
             // Execute commands
-            if (allowCommands) {
+            if (allowCommands && responseData.commands.length > 0) {
+                const cmd_list_str = responseData.commands.map((cmd: any) => cmd.name).join(',');
+                responseData.message = `*(${cmd_list_str})* ${responseData.message}`;
                 responseData.commands.forEach((cmd: any) => {
                     this.botApiHandler
-                        .handleRequest(cmd.name.toLowerCase(), cmd.args, conversation, language)
+                        .handleRequest(cmd.name.toLowerCase(), cmd.args, memory_vector, language)
                         .then(result => {
                             // Add API response to system messages when finished
                             if (result.length > 0) {
@@ -85,6 +103,7 @@ export abstract class BotClient {
 
     protected async getMessages(
         conversation: ConvMessage[],
+        memory_vector: number[],
         language: string
     ): Promise<ConvMessage[]> {
         const messages = [];
@@ -104,12 +123,9 @@ export abstract class BotClient {
             });
         }
 
-        // add memories related to the context
-        const memContext = conversation.filter(msg => msg.role != 'system');
-        if (memContext.length > 0) {
-            // get memories
-            const vector = await this.botModel.createEmbedding(memContext);
-            const memories = vector.length > 0 ? await this.memory.get(vector, 10) : [];
+        if (memory_vector.length > 0) {
+            // get memories related to the memory vector
+            const memories = await this.memory.get(memory_vector, 10);
 
             // add limited amount of memories
             while (memories.length > 0) {

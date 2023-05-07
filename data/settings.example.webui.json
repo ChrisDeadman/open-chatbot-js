@@ -4,7 +4,7 @@
   "bot_name": "Computer",
   "bot_backend": "http://127.0.0.1:5000/api/v1",
   "bot_model": "IGNORED",
-  "embedding_model": "NOT_SUPPORTED",
+  "embedding_model": "sentence-transformers/all-mpnet-base-v2",
   "bot_model_token_limit": 2000,
   "bot_model_rate_limit_ms": 0,
   "message_history_size": 50,

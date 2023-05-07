@@ -37,12 +37,13 @@ docker build -t deads-inc/open-chatbot-js .
 `<mode>` is one of the implemented clients, e.g. `terminal`.
 
 ```
-docker run -it --rm --net=host -v ./data/settings.json:/app/data/settings.json -v deads-inc/open-chatbot-js <mode> -s data/settings.json
+docker run -it --rm --net=host -v ./data/settings.json:/app/data/settings.json deads-inc/open-chatbot-js <mode> -s data/settings.json
 ```
 
 ## 🏗️ Build locally
 
 ```
+pip install -r utils/requirements.txt
 cd ./open-chatbot-js
 npm install --omit=dev
 npx tsc --project tsconfig.prod.json

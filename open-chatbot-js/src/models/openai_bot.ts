@@ -3,7 +3,9 @@ import { Job, Queue, QueueEvents, Worker } from 'bullmq';
 import { ChatCompletionRequestMessageRoleEnum, Configuration, OpenAIApi } from 'openai';
 import { settings } from '../settings.js';
 import { countStringTokens } from '../utils/token_utils.js';
-import { BotModel, ConvMessage } from './bot_model.js';
+import { BotModel } from './bot_model.js';
+import { ConvMessage } from './conv_message.js';
+import { EmbeddingModel } from './embedding_model.js';
 
 enum JobType {
     chat = 'chat',
@@ -12,8 +14,9 @@ enum JobType {
 
 type JobData = { messages: ConvMessage[] };
 
-export class OpenAIBot implements BotModel {
+export class OpenAIBot implements BotModel, EmbeddingModel {
     name: string;
+    embedding_dimension = 1536;
     private openai: OpenAIApi;
     private model: string;
     private chatQueue: Queue<JobData, any>;
@@ -158,7 +161,7 @@ export class OpenAIBot implements BotModel {
     }
 
     private async _createEmbedding(messages: ConvMessage[]): Promise<number[]> {
-        const input = messages.map(msg => msg.content).join('\n');
+        const input = messages.map(msg => msg.content).join(' ');
         const result = await this.openai.createEmbedding({
             input: input,
             model: settings.embedding_model,

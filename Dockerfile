@@ -1,12 +1,19 @@
 # Use the node image
-FROM node:alpine
+FROM node:latest
 
 WORKDIR /app
 
 # Install required packages
-RUN apk update && \
-    apk --no-cache add bash chromium g++ git make python3-dev py3-flask py3-numpy py3-pip py3-yaml ttf-freefont udev unzip vips-dev wget && \
-    rm -rf /var/cache/apk/* && \
+RUN export DEBIAN_FRONTEND="noninteractive" && \
+    apt update && \
+    apt install -y \
+        bash chromium curl cython3 fonts-noto fonts-freefont-ttf git graphviz libopenblas-base openssl \
+        python3-freetype python3-numpy python3-pip python3-scipy python3-setuptools python3-wheel python3-yaml \
+        udev unzip wget && \
+    apt autoclean && \
+    apt clean && \
+    rm -rf /root/.cache && \
+    rm -rf /root/.[acpw]* && \
     rm -rf /usr/share/man && \
     rm -rf /tmp/*
 
@@ -20,7 +27,7 @@ RUN mkdir -p /app/data/browser_extensions/ && \
 
 # We don't need the standalone Chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
-ENV PUPPETEER_EXECUTABLE_PATH "/usr/bin/chromium-browser"
+ENV PUPPETEER_EXECUTABLE_PATH "/usr/bin/chromium"
 
 # Download audio samples
 RUN mkdir -p /app/data/audio/ && \
@@ -30,8 +37,25 @@ RUN mkdir -p /app/data/audio/ && \
 # Copy package.json
 COPY open-chatbot-js/package.json ./
 
-# Install npm packages
-RUN npm install --omit=dev
+# Copy requirements.txt
+COPY utils/requirements.txt ./utils/
+
+# install python/npm packages
+RUN export DEBIAN_FRONTEND="noninteractive" && \
+    export DEV_PACKAGES="build-essential cargo cmake make g++ gfortran rustc libfreetype-dev libffi-dev libjpeg-dev libopenblas-dev libpng-dev libstdc++-10-dev libvips-dev python3-dev" && \
+    apt install -y $DEV_PACKAGES && \
+    pip install --no-cache-dir -r ./utils/requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu && \
+    npm install --omit=dev && \
+    apt purge -y $DEV_PACKAGES && \
+    apt autoclean && \
+    apt clean && \
+    rm -rf /root/.cache && \
+    rm -rf /root/.[acpw]* && \
+    rm -rf /usr/share/man && \
+    rm -rf /tmp/*
+
+# Copy utils
+COPY utils/ ./utils/
 
 # Copy chatbot
 COPY open-chatbot-js/ ./

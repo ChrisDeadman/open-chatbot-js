@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { settings } from '../settings.js';
 import { countStringTokens } from '../utils/token_utils.js';
-import { BotModel, ConvMessage } from './bot_model.js';
+import { BotModel } from './bot_model.js';
+import { ConvMessage } from './conv_message.js';
 
 export class WebUIBot implements BotModel {
     name: string;
@@ -69,7 +70,7 @@ export class WebUIBot implements BotModel {
             const regex = new RegExp(`(<START|You:|${senders}:).*`, 'gi');
             const endRegex = new RegExp(`(<|>|You|${this.name})+[:]*\\s*$`, 'gi');
             return String(completion.data.results[0].text)
-                .replace(`${this.name}:}`, '')
+                .replaceAll(`${this.name}:}`, '')
                 .replace(regex, '')
                 .trim()
                 .replace(endRegex, '')
@@ -78,11 +79,6 @@ export class WebUIBot implements BotModel {
             console.error(`WebUI: ${error}`);
         }
         return '';
-    }
-
-    async createEmbedding(_messages: ConvMessage[]): Promise<number[]> {
-        // TODO: support embeddings
-        return [];
     }
 
     private convMessageToString(message: ConvMessage): string {
