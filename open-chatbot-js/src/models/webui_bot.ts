@@ -41,13 +41,21 @@ export class WebUIBot implements BotModel {
                     .concat(['U', 'User'])
             )
         );
-        const stopping_strings = ['<START>', '<END>', '</END>', '\nUser:', '\nSystem:'].concat(
-            senders.map(s => `\n${s}:`)
-        );
+        const stopping_strings = [
+            '<START>',
+            '<END>',
+            '</END>',
+            '<ANSWER>',
+            '\nUser:',
+            '\nSystem:',
+        ].concat(senders.map(s => `\n${s}:`));
         const prompt =
             messages.map(this.convMessageToString.bind(this)).join('\n') + `\n${this.name}:`;
 
         try {
+            console.debug(`WebUI: chat with ${messages.length} messages...`);
+            const startTime = Date.now();
+
             const completion = await axios.post(
                 `${this.endpoint}/generate`,
                 {
@@ -62,6 +70,10 @@ export class WebUIBot implements BotModel {
                     timeout: settings.browser_timeout,
                 }
             );
+
+            const endTime = Date.now();
+            const elapsedMs = endTime - startTime;
+            console.debug(`WebUI: response received after ${elapsedMs}ms`);
 
             const regex1 = new RegExp(
                 `(${stopping_strings

@@ -70,12 +70,10 @@ export abstract class BotClient {
 
             // Execute commands
             if (allowCommands && responseData.commands.length > 0) {
-                if (responseData.message.trim().length > 0) {
-                    const cmd_list_str = Array.from(
-                        new Set(responseData.commands.map((cmd: any) => `\`${cmd.command}\``))
-                    ).join(' ');
-                    responseData.message = `${cmd_list_str} ${responseData.message}`;
-                }
+                const cmd_list_str = Array.from(
+                    new Set(responseData.commands.map((cmd: any) => `\`${cmd.command}\``))
+                ).join(' ');
+                responseData.message = `${cmd_list_str} ${responseData.message}`;
                 responseData.commands.forEach((cmd: Record<string, string>) => {
                     // Clear message upon NOP command
                     if (cmd.command === Command.Nop) {
@@ -172,7 +170,7 @@ export abstract class BotClient {
 
         const lines = response
             .replaceAll('\r', '')
-            .replaceAll(/(\n){2,}/g, '\n\n')
+            .replaceAll(/(\s*\n\s*){2,}/g, '\n')
             .split('\n');
 
         let commands: any[] = [];
