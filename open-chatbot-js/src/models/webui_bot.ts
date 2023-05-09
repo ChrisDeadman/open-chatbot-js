@@ -33,57 +33,47 @@ export class WebUIBot implements BotModel {
     async chat(messages: ConvMessage[]): Promise<string> {
         const commands = Object.values(Command).map(c => c.toString());
         const senders = Array.from(
-            new Set(messages.map(message => message.sender).concat(commands))
+            new Set(
+                messages
+                    .filter(message => message.role != 'assistant')
+                    .map(message => message.sender)
+                    .concat(commands)
+                    .concat(['U', 'User'])
+            )
         );
+        const stopping_strings = ['<START>', '<END>', '</END>', '\nUser:', '\nSystem:'].concat(
+            senders.map(s => `\n${s}:`)
+        );
+        const prompt =
+            messages.map(this.convMessageToString.bind(this)).join('\n') + `\n${this.name}:`;
 
         try {
             const completion = await axios.post(
                 `${this.endpoint}/generate`,
                 {
-                    prompt:
-                        messages.map(this.convMessageToString.bind(this)).join('\n') +
-                        `\n${this.name}:`,
-                    seed: -1,
-                    use_story: false,
-                    use_memory: false,
+                    prompt: prompt,
                     use_authors_note: false,
+                    use_memory: false,
+                    use_story: false,
                     use_world_info: false,
-                    //early_stopping: false,
-                    //add_bos_token: true,
-                    //ban_eos_token: false,
-                    //skip_special_tokens: true,
-                    max_context_length: settings.bot_model_token_limit,
-                    max_new_tokens: 200,
-                    //max_length: 100,
-                    rep_pen: 1.1,
-                    rep_pen_range: 1024,
-                    rep_pen_slope: 0.9,
-                    temperature: 0.65,
-                    tfs: 0.9,
-                    top_a: 0,
-                    top_k: 0,
-                    top_p: 0.9,
-                    typical: 1,
-                    sampler_order: [6, 0, 1, 2, 3, 4, 5],
-                    stopping_strings: ['\n<START>', '\n<END>', '\n</END>', '\nYou:'].concat(
-                        senders.map(sender => `\n${sender}:`)
-                    ),
+                    stopping_strings: stopping_strings,
                 },
                 {
                     timeout: settings.browser_timeout,
                 }
             );
 
-            const regex = new RegExp(`(<START|<END|</END|You:|${senders.join(':|')}:).*`, 'gi');
-            const endRegex = new RegExp(
-                `(<|>|You|${senders.join('|')}|${this.name})+[:]*\\s*$`,
+            const regex1 = new RegExp(
+                `(${stopping_strings
+                    .map(s => s.substring(0, s.length - 1).replaceAll('|', '[|]'))
+                    .join('|')}|${senders.join(':|')}:).*`,
                 'gi'
             );
+            const regex2 = new RegExp(`(<|>|${senders.join('|')})+[:]*\\s*$`, 'gi');
             return String(completion.data.results[0].text)
                 .replaceAll(`${this.name}:`, '')
-                .replace(regex, '')
-                .trim()
-                .replace(endRegex, '')
+                .replace(regex1, '')
+                .replace(regex2, '')
                 .trim();
         } catch (error) {
             console.error(`WebUI: ${error}`);

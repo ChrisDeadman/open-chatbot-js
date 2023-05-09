@@ -40,11 +40,11 @@ export class CommandApi {
     ): Promise<string> {
         let response = '';
 
+        console.info(`CMD ${JSON.stringify(command_args)}`);
+
         if (command_args.command.length <= 0 || command_args.command === Command.Nop) {
             return response;
         }
-
-        console.info(`CMD ${JSON.stringify(command_args)}`);
 
         try {
             switch (command_args.command) {

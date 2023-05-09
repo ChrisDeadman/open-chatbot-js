@@ -143,8 +143,8 @@ export class BotBrowser {
                             .replaceAll('$LANGUAGE', language),
                     },
                     {
-                        role: 'system',
-                        sender: 'system',
+                        role: 'assistant',
+                        sender: this.botModel.name,
                         content: `Summary:\n${pageData.summary}`,
                     },
                     {

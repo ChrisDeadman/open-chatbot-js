@@ -1,4 +1,4 @@
-import { CommandApi } from '../bot_api/command_api.js';
+import { Command, CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
 import { ConvMessage } from '../models/conv_message.js';
@@ -72,11 +72,15 @@ export abstract class BotClient {
             if (allowCommands && responseData.commands.length > 0) {
                 if (responseData.message.trim().length > 0) {
                     const cmd_list_str = Array.from(
-                        new Set(responseData.commands.map((cmd: any) => cmd.command))
-                    ).map(cmd => `\`${cmd}\``).join(' ');
+                        new Set(responseData.commands.map((cmd: any) => `\`${cmd.command}\``))
+                    ).join(' ');
                     responseData.message = `${cmd_list_str} ${responseData.message}`;
                 }
                 responseData.commands.forEach((cmd: Record<string, string>) => {
+                    // Clear message upon NOP command
+                    if (cmd.command === Command.Nop) {
+                        responseData.message = '';
+                    }
                     this.botApiHandler.handleRequest(cmd, memory_vector, language).then(result => {
                         // Add API response to system messages when finished
                         if (result.length > 0) {
@@ -166,17 +170,21 @@ export abstract class BotClient {
         }
         // console.debug(`RAW RESPONSE: ${response}`);
 
-        const lines = response.split('\n');
+        const lines = response
+            .replaceAll('\r', '')
+            .replaceAll(/(\n){2,}/g, '\n\n')
+            .split('\n');
+
         let commands: any[] = [];
 
         // check each response line for commands
-        for (let i=0; i < lines.length; i+= 1) {
+        for (let i = 0; i < lines.length; i += 1) {
             const line = lines[i];
             const new_cmds = this.parseCommand(line);
             if (new_cmds.length > 0) {
                 commands = commands.concat(new_cmds);
-                lines.splice(i, 1)
-                i -= 1
+                lines.splice(i, 1);
+                i -= 1;
             }
         }
 

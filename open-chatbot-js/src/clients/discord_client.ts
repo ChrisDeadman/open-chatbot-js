@@ -178,6 +178,7 @@ export class DiscordClient extends BotClient {
             const messages = await this.getMessages(convContext, [], settings.default_language);
             const response = await this.botModel.chat(messages);
             const responseData = this.parseResponse(response);
+            responseData.message = responseData.message.split('.')[0]
             console.log(`Status message: ${responseData.message}`);
 
             console.log('Setting bot status...');

@@ -19,7 +19,7 @@ export class TerminalClient extends BotClient {
         embeddingModel: EmbeddingModel,
         memory: MemoryProvider,
         botApiHandler: CommandApi,
-        username = 'You'
+        username = 'User'
     ) {
         super(botModel, embeddingModel, memory, botApiHandler);
         this.username = username;
