@@ -13,6 +13,7 @@ export class TerminalClient extends BotClient {
     protected conversation: CyclicBuffer<ConvMessage>;
 
     private username;
+    private chatting = false;
 
     constructor(
         botModel: BotModel,
@@ -41,7 +42,9 @@ export class TerminalClient extends BotClient {
     }
 
     async handleResponse(_context: any, response: string): Promise<void> {
-        console.log(`${this.botModel.name}: ${response}`);
+        if (!this.chatting) process.stdout.write('\n');
+        process.stdout.write(`${this.botModel.name}: ${response.trim()}\n`);
+        if (!this.chatting) process.stdout.write(`${this.username}> `);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -56,6 +59,7 @@ export class TerminalClient extends BotClient {
 
     private initEventListeners() {
         this.rlInterface.on('line', async (line: string) => {
+            this.chatting = true;
             try {
                 line = line.trim();
                 if (line.length > 0) {
@@ -71,6 +75,8 @@ export class TerminalClient extends BotClient {
                 }
             } catch (error) {
                 console.error(error);
+            } finally {
+                this.chatting = false;
             }
             process.stdout.write(`${this.username}> `);
         });

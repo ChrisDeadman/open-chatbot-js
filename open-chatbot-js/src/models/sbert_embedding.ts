@@ -29,7 +29,7 @@ export class SbertEmbedding implements EmbeddingModel {
             const output = await this.runPythonScript('utils/sbert-embeddings.py', [
                 '--model',
                 `"${this.embedding_model}"`,
-                `"${memContext.join(' ').replaceAll('"', "'")}"`,
+                `'${memContext.join(" ").replaceAll("'", '"')}'`,
             ]);
             const embeddings = JSON.parse(output);
             return embeddings.flat();

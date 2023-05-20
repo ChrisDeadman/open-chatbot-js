@@ -54,7 +54,7 @@ export class BotBrowser {
     }
 
     private async readPage(pageData: PageData, question: string, language: string) {
-        const chunkSize = settings.bot_model_token_limit - 512;
+        const chunkSize = settings.bot_model_token_limit - settings.bot_browser_prompt.length - 512;
         const proto_url = pageData.url
             .replace('http://', '')
             .replace('https://', '')

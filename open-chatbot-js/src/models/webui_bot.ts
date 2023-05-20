@@ -64,6 +64,12 @@ export class WebUIBot implements BotModel {
                     use_memory: false,
                     use_story: false,
                     use_world_info: false,
+                    temperature: 0.63,
+                    top_p: 0.98,
+                    typical_p: 1,
+                    top_k: 0,
+                    max_new_tokens: 768,
+                    truncation_length: settings.bot_model_token_limit,
                     stopping_strings: stopping_strings,
                 },
                 {
@@ -84,6 +90,8 @@ export class WebUIBot implements BotModel {
             const regex2 = new RegExp(`(<|>|${senders.join('|')})+[:]*\\s*$`, 'gi');
             return String(completion.data.results[0].text)
                 .replaceAll(`${this.name}:`, '')
+                .replaceAll('\\\\_', '_')
+                .replaceAll('\\_', '_')
                 .replace(regex1, '')
                 .replace(regex2, '')
                 .trim();

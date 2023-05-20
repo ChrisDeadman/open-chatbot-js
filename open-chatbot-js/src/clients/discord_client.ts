@@ -134,14 +134,22 @@ export class DiscordClient extends BotClient {
     }
 
     protected startTyping(channel: any, timeoutMs = 5000): void {
-        // Send typing every few seconds as long as bot is working
-        channel.sendTyping();
-        this.typingTimeout = setTimeout(() => this.startTyping(channel), timeoutMs);
+        if (!this.typingTimeout) {
+            // Send typing every few seconds as long as bot is working
+            channel.sendTyping();
+            this.typingTimeout = setTimeout(() => {
+                this.typingTimeout = undefined;
+                this.startTyping(channel);
+            }, timeoutMs);
+        }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     protected stopTyping(_channel: any): void {
-        clearTimeout(this.typingTimeout);
+        if (this.typingTimeout) {
+            clearTimeout(this.typingTimeout);
+            this.typingTimeout = undefined;
+        }
     }
 
     getConversation(channelId: Snowflake) {

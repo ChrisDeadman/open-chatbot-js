@@ -40,8 +40,6 @@ export class CommandApi {
     ): Promise<string> {
         let response = '';
 
-        console.info(`CMD ${JSON.stringify(command_args)}`);
-
         if (command_args.command.length <= 0 || command_args.command === Command.Nop) {
             return response;
         }
@@ -73,9 +71,14 @@ export class CommandApi {
                 }
                 case Command.BrowseWebsite: {
                     response = 'ERROR: Your browser is broken.';
+                    const question =
+                        typeof command_args.question === 'string' &&
+                        command_args.question.trim() !== ''
+                            ? command_args.question
+                            : 'what is on the website?';
                     const pageData = await this.botBrowser.getPageData(
                         command_args.url,
-                        command_args.question,
+                        question,
                         language
                     );
                     response = pageData.summary;
@@ -91,8 +94,7 @@ export class CommandApi {
         }
 
         if (response.length > 0) {
-            console.info(`CMD ${command_args.command}: ${response.slice(0, 300)}`);
-            response = `${command_args.command}: ${response}`;
+            response = `\`${command_args.command}\`: ${response}`;
         }
 
         return response;
