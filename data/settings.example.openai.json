@@ -44,6 +44,12 @@
     "Allows you to remove incorrect or irrelevant data from your database.",
     "Format: `{\"command\":\"delete_memory\",\"data\":\"<data to delete>\"}`",
     "",
+    "## python",
+    "Python code you write is instantly executed.",
+    "Use python code for tasks the other tools cannot do (e.g. import os and call os.system to execute any system command).",
+    "Do not run functions that might block indefinitely (e.g. reading from stdin).",
+    "Format: Put python code inside ```python code blocks (terminated with ```).",
+    "",
     "To use a tool, incorporate the appropriate tool format into your response.",
     "",
     "# Conversation"

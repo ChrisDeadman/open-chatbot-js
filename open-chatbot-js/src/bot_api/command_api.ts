@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { Browser } from 'puppeteer';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
@@ -13,6 +14,7 @@ export enum Command {
     StoreMemory = 'store_memory',
     DeleteMemory = 'delete_memory',
     BrowseWebsite = 'browse_website',
+    Python = 'python',
 }
 
 export class CommandApi {
@@ -82,6 +84,20 @@ export class CommandApi {
                         language
                     );
                     response = pageData.summary;
+                    break;
+                }
+                case Command.Python: {
+                    const completion = await axios.post(
+                        'http://localhost:8080/execute',
+                        String(command_args.data),
+                        {
+                            headers: {
+                                'Content-Type': 'text/plain',
+                            },
+                            timeout: settings.browser_timeout,
+                        }
+                    );
+                    response = String(completion.data);
                     break;
                 }
                 default: {

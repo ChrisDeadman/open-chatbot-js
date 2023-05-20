@@ -2,11 +2,17 @@
 
 Chatbot with a 'sort-of' long-term memory 🧠 with [Text generation web UI](https://github.com/oobabooga/text-generation-webui) and ChatGPT backend.
 
-Implements the following clients:
 
-- `terminal`: 💻 terminal based chats
-- `sttts`: 🗣️ Speech-To-Text & Text-To-Speech
-- `discord`: 🎮 a discord bot you can add to your server
+## 🌟 Features
+
+- Support for multiple clients
+  * `terminal`: 💻 terminal based chats
+  * `sttts`: 🗣️ Speech-To-Text & Text-To-Speech
+  * `discord`: 🎮 a discord bot you can add to your server
+- Rolling message history
+- Long-term memory using RediSearch with embeddings
+- Message correction that feeds corrections back into message history (e.g. can correct some command syntax issues)
+- Bot can call Tools (including web-browsing and code execution)
 
 ## 📦 Dependencies
 
@@ -18,8 +24,9 @@ Implements the following clients:
 
 ### Optional
 
-- **[Audio Samples](data/audio/README.md)**.
-- **[Browser Extensions](data/browser_extensions/README.md)**.
+- **[Audio Samples](data/audio/README.md)**
+- **[Browser Extensions](data/browser_extensions/README.md)**
+- **[python-executor](python-executor/README.md)**
 
 ## 🛠️ Configuration
 

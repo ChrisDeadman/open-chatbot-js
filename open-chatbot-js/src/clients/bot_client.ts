@@ -177,19 +177,29 @@ export abstract class BotClient {
             if (new_cmds.length > 0) {
                 // Add to the parsed command list
                 commands = commands.concat(new_cmds);
-                // Replace commands with parsed commands in the response
-                response = response.replace(
-                    match[0],
-                    new_cmds.map((cmd: any) => `\`${JSON.stringify(cmd)}\``).join('\n')
-                );
+                if (new_cmds.length > 1 || new_cmds[0].command != Command.Python) {
+                    // Replace commands with parsed commands in the response
+                    response = response.replace(
+                        match[0],
+                        new_cmds.map((cmd: any) => `\`${JSON.stringify(cmd)}\``).join('\n')
+                    );
+                }
             }
         }
 
         return { message: response, commands: commands };
-        }
+    }
 
     private parseCommand(response: string): Record<string, string>[] {
         const commands: Record<string, string>[] = [];
+
+        // Match code-block types with commands
+        const cmd = response.trimStart().match(
+            new RegExp(`^(${Object.values(Command).join('|')})\\s*([\\s\\S]+)`, 'i')
+        );
+        if (cmd) {
+            return [{ command: cmd[1], data: cmd[2] }];
+        }
 
         try {
             // Fix and parse json
