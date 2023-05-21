@@ -43,6 +43,7 @@ export class WebUIBot implements BotModel {
         );
         const stopping_strings = [
             '<START>',
+            '</s>',
             '<END>',
             '</END>',
             '<ANSWER>',

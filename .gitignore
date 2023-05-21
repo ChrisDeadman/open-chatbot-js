@@ -141,3 +141,5 @@ data/audio/*
 !data/audio/README.md
 data/browser_extensions/*
 !data/browser_extensions/README.md
+!data/images/
+!data/web_client/

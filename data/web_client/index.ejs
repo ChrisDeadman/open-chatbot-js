@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.8.0/build/styles/atom-one-dark-reasonable.min.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+  </head>
+  <body data-bs-theme="dark">
+    <div class="container py-5">
+      <div class="justify-content-center align-items-center">
+        <div>
+          <h1 class="text-center mb-4">🤖 open-chatbot-js 🤖</h2>
+          <!-- Settings Modal -->
+          <div class="modal fade" id="settingsModal" tabindex="-1" role="dialog" aria-labelledby="settingsModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
+                </div>
+                <form id="settingsForm" class="modal-body">
+                  <div class="form-group">
+                    <label for="username" class="py-2">User Name:</label>
+                    <input type="text" id="username" class="form-control py-2" value="<%= username %>" />
+                  </div>
+                  <div class="form-group">
+                    <label for="botname" class="py-2">Bot Name:</label>
+                    <input type="text" id="botname" class="form-control py-2" value="<%= botname %>" />
+                  </div>
+                  <div class="form-group">
+                    <label for="language" class="py-2">Language:</label>
+                    <input type="text" id="language" class="form-control py-2" value="<%= language %>" />
+                  </div>
+                  <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary" data-bs-dismiss="modal">Save</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+          <!-- Prompt Modal -->
+          <div class="modal fade" id="promptModal" tabindex="-1" role="dialog" aria-labelledby="promptModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="promptModalLabel">Prompt</h5>
+                </div>
+                <form id="promptForm" class="modal-body">
+                  <div class="form-group">
+                    <label for="initialPrompt" class="py-2">Initial Prompt:</label>
+                    <textarea id="initialPrompt" class="form-control py-2" rows="15"><%= initialPrompt %></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label for="botBrowserPrompt" class="py-2">Bot-Browser Prompt:</label>
+                    <textarea id="botBrowserPrompt" class="form-control py-2" rows="10" disabled readonly><%= botBrowserPrompt %></textarea>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary" data-bs-dismiss="modal">Save</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+          <div class="d-flex flex-row justify-content-end">
+            <!-- Prompt button -->
+            <div class="input-group-append">
+              <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#promptModal">
+                Prompt
+              </button> 
+            </div>
+            <!-- Settings button -->
+            <div class="input-group-prepend">
+              <button type="button" class="btn btn-secondary ms-2" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                <i class="fas fa-cog"></i>
+              </button> 
+            </div>
+          </div>
+          <!-- Message History -->
+          <div id="messages" class="d-flex flex-column border rounded p-2 my-2" style="height: 55vh; overflow-y: auto;"></div>
+          <!-- Chat Form -->
+          <form id="messageForm" class="input-group">
+            <div class="d-flex flex-column flex-grow-1">
+              <!-- Message Input -->
+              <div id="userInput" class="textarea form-control flex-grow-1" contenteditable></div>
+              <!-- Send button -->
+              <div class="input-group-append align-self-end my-2">
+                <button class="btn btn-primary">Send</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.7.0.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/lib/marked.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked-highlight/lib/index.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="chat.js"></script>
+  </body>
+</html>

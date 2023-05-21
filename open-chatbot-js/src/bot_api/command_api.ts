@@ -88,7 +88,7 @@ export class CommandApi {
                 }
                 case Command.Python: {
                     const completion = await axios.post(
-                        'http://localhost:8080/execute',
+                        `http://${settings.python_executor_host}:${settings.python_executor_port}/execute`,
                         String(command_args.data),
                         {
                             headers: {

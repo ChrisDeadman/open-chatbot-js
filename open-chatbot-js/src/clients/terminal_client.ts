@@ -42,9 +42,11 @@ export class TerminalClient extends BotClient {
     }
 
     async handleResponse(_context: any, response: string): Promise<void> {
-        if (!this.chatting) process.stdout.write('\n');
-        process.stdout.write(`${this.botModel.name}: ${response.trim()}\n`);
-        if (!this.chatting) process.stdout.write(`${this.username}> `);
+        if (this.chatting) {
+            process.stdout.write(`${this.botModel.name}: ${response.trim()}\n`);
+        } else {
+            process.stdout.write(`\n${response.trim()}\n${this.username}> `);
+        }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

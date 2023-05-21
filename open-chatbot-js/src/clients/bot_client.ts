@@ -13,6 +13,7 @@ export abstract class BotClient {
     public embeddingModel: EmbeddingModel;
     public memory: MemoryProvider;
     protected botApiHandler: CommandApi;
+    protected initialPrompt: string;
 
     constructor(
         botModel: BotModel,
@@ -24,6 +25,7 @@ export abstract class BotClient {
         this.embeddingModel = embeddingModel;
         this.memory = memory;
         this.botApiHandler = botApiHandler;
+        this.initialPrompt = settings.initial_prompt.join('\n');
     }
 
     abstract startup(): Promise<void>;
@@ -104,29 +106,28 @@ export abstract class BotClient {
 
     protected async getMessages(
         conversation: ConvMessage[],
-        memory_vector: number[],
+        memoryVector: number[],
         language: string
     ): Promise<ConvMessage[]> {
         const messages: ConvMessage[] = [];
 
-        const initial_prompt = settings.initial_prompt
-            .join('\n')
+        const initialPrompt = this.initialPrompt
             .replaceAll('$BOT_NAME', this.botModel.name)
             .replaceAll('$NOW', dateTimeToStr(new Date(), settings.locale))
             .replaceAll('$LANGUAGE', language);
 
         // add initial prompt to the context
-        if (initial_prompt.length >= 0) {
+        if (initialPrompt.length >= 0) {
             messages.push({
                 role: 'system',
                 sender: 'system',
-                content: initial_prompt,
+                content: initialPrompt,
             });
         }
 
-        if (memory_vector.length > 0) {
+        if (memoryVector.length > 0) {
             // get memories related to the memory vector
-            const memories = (await this.memory.get(memory_vector, 10)).map(m => ({
+            const memories = (await this.memory.get(memoryVector, 10)).map(m => ({
                 role: 'system',
                 sender: 'system',
                 content: m,
@@ -194,9 +195,9 @@ export abstract class BotClient {
         const commands: Record<string, string>[] = [];
 
         // Match code-block types with commands
-        const cmd = response.trimStart().match(
-            new RegExp(`^(${Object.values(Command).join('|')})\\s*([\\s\\S]+)`, 'i')
-        );
+        const cmd = response
+            .trimStart()
+            .match(new RegExp(`^(${Object.values(Command).join('|')})\\s*([\\s\\S]+)`, 'i'));
         if (cmd) {
             return [{ command: cmd[1], data: cmd[2] }];
         }

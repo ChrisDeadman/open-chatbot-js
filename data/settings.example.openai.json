@@ -12,7 +12,7 @@
   "locale": "en-US",
   "default_language": "English",
   "status_language": "English",
-  "status_prompt": "How do you feel today? max. 6 words, in $LANGUAGE.",
+  "status_prompt": "Please enter a status message, max. 6 words, in $LANGUAGE:",
   "initial_prompt": [
     "# Persona",
     "$BOT_NAME from Star Trek TNG.",
@@ -72,8 +72,12 @@
     "chat_ready": "data/audio/Unphased.ogg",
     "chat_thinking": "data/audio/Modular.ogg"
   },
+  "web_server_host": "0.0.0.0",
+  "web_server_port": 8000,
   "redis_host": "localhost",
   "redis_port": 6379,
+  "python_executor_host": "localhost",
+  "python_executor_port": 8080,
   "proxy_host": null,
   "proxy_port": 8888,
   "browser_timeout": 60000,

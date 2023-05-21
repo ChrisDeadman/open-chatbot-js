@@ -14,6 +14,7 @@ import { BotClient } from './clients/bot_client.js';
 import { DiscordClient } from './clients/discord_client.js';
 import { STTTSClient } from './clients/sttts_client.js';
 import { TerminalClient } from './clients/terminal_client.js';
+import { WebClient } from './clients/web_client.js';
 import { MemoryProvider } from './memory/memory_provider.js';
 import { RedisMemory } from './memory/redis_memory_provider.js';
 import { EmbeddingModel } from './models/embedding_model.js';
@@ -32,6 +33,8 @@ function createClient(
             return new DiscordClient(botModel, embeddingModel, memory, botApiHandler);
         case 'sttts':
             return new STTTSClient(botModel, embeddingModel, memory, speech, botApiHandler);
+        case 'web':
+            return new WebClient(botModel, embeddingModel, memory, botApiHandler);
         default:
             return new TerminalClient(botModel, embeddingModel, memory, botApiHandler);
     }
@@ -39,6 +42,7 @@ function createClient(
 
 const argv = await yargs(hideBin(process.argv))
     .command('terminal', 'start the bot in terminal mode')
+    .command('web', 'start the bot in web-interface mode')
     .command('sttts', 'start the bot in sttts mode')
     .command('discord', 'start the bot in discord mode')
     .demandCommand(1)
