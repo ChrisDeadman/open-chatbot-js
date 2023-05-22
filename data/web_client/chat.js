@@ -84,6 +84,7 @@ socket.on("chat message", function (msg) {
 
 socket.on("typing", function () {
   messages.appendChild(typingIndicator);
+  messages.scrollTop = messages.scrollHeight;
 });
 
 socket.on("stop typing", function () {
