@@ -3,9 +3,12 @@ import { SchemaFieldTypes, VectorAlgorithms, createClient } from 'redis';
 import { toFloat32Buffer } from '../utils/conversion_utils.js';
 import { MemoryProvider } from './memory_provider.js';
 
+import { ConvMessage } from '../models/conv_message.js';
+import { EmbeddingModel } from '../models/embedding_model.js';
+
 export class RedisMemory extends MemoryProvider {
     private redis: RedisClientType;
-    private vectorDim: number;
+    private embeddingModel: EmbeddingModel;
     private memoryIndex: string;
     private searchPrefix: string;
     private initComplete: Promise<void>;
@@ -13,12 +16,12 @@ export class RedisMemory extends MemoryProvider {
     constructor(
         redisHost: string,
         redisPort: number,
-        vectorDim: number,
+        embeddingModel: EmbeddingModel,
         memoryIndex = 'idx:memory',
         searchPrefix = 'noderedis:knn'
     ) {
         super();
-        this.vectorDim = vectorDim;
+        this.embeddingModel = embeddingModel;
         this.memoryIndex = memoryIndex;
         this.searchPrefix = searchPrefix;
 
@@ -37,13 +40,10 @@ export class RedisMemory extends MemoryProvider {
         await this.createIndex();
     }
 
-    async add(vector: number[], data: string) {
+    async add(context: ConvMessage[], data: string) {
         await this.initComplete;
 
-        if (vector.length != this.vectorDim) {
-            throw Error(`vector dimension must be exactly ${this.vectorDim}.`);
-        }
-
+        const vector = await this.embeddingModel.createEmbedding(context);
         const dataDict = {
             data: data,
             embedding: toFloat32Buffer(vector),
@@ -56,14 +56,14 @@ export class RedisMemory extends MemoryProvider {
         await this.redis.hSet(`${this.searchPrefix}:${id}`, dataDict);
     }
 
-    async del(vector: number[]) {
+    async del(context: ConvMessage[], data: string) {
         await this.initComplete;
 
-        if (vector.length != this.vectorDim) {
-            throw Error(`vector dimension must be exactly ${this.vectorDim}.`);
-        }
-
         const baseQuery = `*=>[KNN 1 @embedding $vector AS dist]`;
+        const vector = await this.embeddingModel.createEmbedding([
+            ...context,
+            { role: 'assistant', sender: 'assistant', content: data },
+        ]);
         const results = await this.redis.ft.search(this.memoryIndex, baseQuery, {
             PARAMS: {
                 vector: toFloat32Buffer(vector),
@@ -83,14 +83,11 @@ export class RedisMemory extends MemoryProvider {
         await this.redis.del(docId);
     }
 
-    async get(vector: number[], numRelevant = 1): Promise<string[]> {
+    async get(context: ConvMessage[], numRelevant = 1): Promise<string[]> {
         await this.initComplete;
 
-        if (vector.length != this.vectorDim) {
-            throw Error(`vector dimension must be exactly ${this.vectorDim}.`);
-        }
-
         const baseQuery = `*=>[KNN ${numRelevant} @embedding $vector AS dist]`;
+        const vector = await this.embeddingModel.createEmbedding(context);
         const results = await this.redis.ft.search(this.memoryIndex, baseQuery, {
             PARAMS: {
                 vector: toFloat32Buffer(vector),
@@ -132,7 +129,7 @@ export class RedisMemory extends MemoryProvider {
                         type: SchemaFieldTypes.VECTOR,
                         ALGORITHM: VectorAlgorithms.HNSW,
                         TYPE: 'FLOAT32',
-                        DIM: this.vectorDim,
+                        DIM: this.embeddingModel.embedding_dimension,
                         DISTANCE_METRIC: 'COSINE',
                     },
                 },

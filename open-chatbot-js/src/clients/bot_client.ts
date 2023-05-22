@@ -2,7 +2,6 @@ import { Command, CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
 import { ConvMessage } from '../models/conv_message.js';
-import { EmbeddingModel } from '../models/embedding_model.js';
 import { settings } from '../settings.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { CyclicBuffer } from '../utils/cyclic_buffer.js';
@@ -10,19 +9,12 @@ import { fixAndParseJson } from '../utils/json_utils.js';
 
 export abstract class BotClient {
     public botModel: BotModel;
-    public embeddingModel: EmbeddingModel;
     public memory: MemoryProvider;
     protected botApiHandler: CommandApi;
     protected initialPrompt: string;
 
-    constructor(
-        botModel: BotModel,
-        embeddingModel: EmbeddingModel,
-        memory: MemoryProvider,
-        botApiHandler: CommandApi
-    ) {
+    constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: CommandApi) {
         this.botModel = botModel;
-        this.embeddingModel = embeddingModel;
         this.memory = memory;
         this.botApiHandler = botApiHandler;
         this.initialPrompt = settings.initial_prompt.join('\n');
@@ -51,11 +43,9 @@ export abstract class BotClient {
         try {
             // get memory vector related to conversation context
             const memContext = conv_list.filter(msg => msg.role != 'system');
-            const memory_vector =
-                memContext.length > 0 ? await this.embeddingModel.createEmbedding(memContext) : [];
 
             // chat with bot
-            const messages = await this.getMessages(conv_list, memory_vector, language);
+            const messages = await this.getMessages(conv_list, memContext, language);
             const response = await this.botModel.chat(messages);
 
             // parse bot response
@@ -77,7 +67,7 @@ export abstract class BotClient {
                     if (cmd.command === Command.Nop) {
                         responseData.message = '';
                     }
-                    this.botApiHandler.handleRequest(cmd, memory_vector, language).then(result => {
+                    this.botApiHandler.handleRequest(cmd, memContext, language).then(result => {
                         // Add API response to system messages when finished
                         if (result.length > 0) {
                             conversation.push({
@@ -106,7 +96,7 @@ export abstract class BotClient {
 
     protected async getMessages(
         conversation: ConvMessage[],
-        memoryVector: number[],
+        memoryContext: ConvMessage[],
         language: string
     ): Promise<ConvMessage[]> {
         const messages: ConvMessage[] = [];
@@ -125,9 +115,9 @@ export abstract class BotClient {
             });
         }
 
-        if (memoryVector.length > 0) {
+        if (memoryContext.length > 0) {
             // get memories related to the memory vector
-            const memories = (await this.memory.get(memoryVector, 10)).map(m => ({
+            const memories = (await this.memory.get(memoryContext, 10)).map(m => ({
                 role: 'system',
                 sender: 'system',
                 content: m,

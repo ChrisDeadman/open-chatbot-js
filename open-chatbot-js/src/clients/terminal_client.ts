@@ -3,7 +3,6 @@ import { CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
 import { ConvMessage } from '../models/conv_message.js';
-import { EmbeddingModel } from '../models/embedding_model.js';
 import { settings } from '../settings.js';
 import { CyclicBuffer } from '../utils/cyclic_buffer.js';
 import { BotClient } from './bot_client.js';
@@ -17,12 +16,11 @@ export class TerminalClient extends BotClient {
 
     constructor(
         botModel: BotModel,
-        embeddingModel: EmbeddingModel,
         memory: MemoryProvider,
         botApiHandler: CommandApi,
         username = 'User'
     ) {
-        super(botModel, embeddingModel, memory, botApiHandler);
+        super(botModel, memory, botApiHandler);
         this.username = username;
         this.conversation = new CyclicBuffer(settings.message_history_size);
     }

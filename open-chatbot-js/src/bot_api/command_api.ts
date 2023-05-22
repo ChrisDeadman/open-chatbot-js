@@ -2,7 +2,7 @@ import axios from 'axios';
 import { Browser } from 'puppeteer';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
-import { EmbeddingModel } from '../models/embedding_model.js';
+import { ConvMessage } from '../models/conv_message.js';
 import { settings } from '../settings.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { BotBrowser } from './bot_browser.js';
@@ -19,67 +19,50 @@ export enum Command {
 
 export class CommandApi {
     botModel: BotModel;
-    embeddingModel: EmbeddingModel;
     botBrowser: BotBrowser;
     memory: MemoryProvider;
 
-    constructor(
-        botModel: BotModel,
-        embeddingModel: EmbeddingModel,
-        memory: MemoryProvider,
-        browser: Browser
-    ) {
+    constructor(botModel: BotModel, memory: MemoryProvider, browser: Browser) {
         this.botModel = botModel;
-        this.embeddingModel = embeddingModel;
         this.memory = memory;
         this.botBrowser = new BotBrowser(botModel, browser);
     }
 
     async handleRequest(
-        command_args: Record<string, string>,
-        memory_vector: number[],
+        commandArgs: Record<string, string>,
+        memContext: ConvMessage[],
         language: string
     ): Promise<string> {
         let response = '';
 
-        if (command_args.command.length <= 0 || command_args.command === Command.Nop) {
+        if (commandArgs.command.length <= 0 || commandArgs.command === Command.Nop) {
             return response;
         }
 
         try {
-            switch (command_args.command) {
+            switch (commandArgs.command) {
                 case Command.StoreMemory: {
                     const data = `from ${dateTimeToStr(new Date(), settings.locale)}: ${
-                        command_args.data
+                        commandArgs.data
                     }`;
-                    if (memory_vector.length > 0) {
-                        await this.memory.add(memory_vector, data);
+                    if (memContext.length > 0) {
+                        await this.memory.add(memContext, data);
                     }
                     break;
                 }
                 case Command.DeleteMemory: {
-                    const messages = [
-                        {
-                            role: 'assistant',
-                            sender: this.botModel.name,
-                            content: command_args.data,
-                        },
-                    ];
-                    const vector = await this.embeddingModel.createEmbedding(messages);
-                    if (vector.length > 0) {
-                        await this.memory.del(vector);
-                    }
+                    await this.memory.del(memContext, commandArgs.data);
                     break;
                 }
                 case Command.BrowseWebsite: {
                     response = 'ERROR: Your browser is broken.';
                     const question =
-                        typeof command_args.question === 'string' &&
-                        command_args.question.trim() !== ''
-                            ? command_args.question
+                        typeof commandArgs.question === 'string' &&
+                        commandArgs.question.trim() !== ''
+                            ? commandArgs.question
                             : 'what is on the website?';
                     const pageData = await this.botBrowser.getPageData(
-                        command_args.url,
+                        commandArgs.url,
                         question,
                         language
                     );
@@ -89,7 +72,7 @@ export class CommandApi {
                 case Command.Python: {
                     const completion = await axios.post(
                         `http://${settings.python_executor_host}:${settings.python_executor_port}/execute`,
-                        String(command_args.data),
+                        String(commandArgs.data),
                         {
                             headers: {
                                 'Content-Type': 'text/plain',
@@ -110,7 +93,7 @@ export class CommandApi {
         }
 
         if (response.length > 0) {
-            response = `\`${command_args.command}\`: ${response}`;
+            response = `\`${commandArgs.command}\`: ${response}`;
         }
 
         return response;

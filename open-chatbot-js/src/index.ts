@@ -23,20 +23,19 @@ import { SbertEmbedding } from './models/sbert_embedding.js';
 function createClient(
     command: string,
     botModel: BotModel,
-    embeddingModel: EmbeddingModel,
     memory: MemoryProvider,
     speech: SpeechApi,
     botApiHandler: CommandApi
 ): BotClient {
     switch (command) {
         case 'discord':
-            return new DiscordClient(botModel, embeddingModel, memory, botApiHandler);
+            return new DiscordClient(botModel, memory, botApiHandler);
         case 'sttts':
-            return new STTTSClient(botModel, embeddingModel, memory, speech, botApiHandler);
+            return new STTTSClient(botModel, memory, speech, botApiHandler);
         case 'web':
-            return new WebClient(botModel, embeddingModel, memory, botApiHandler);
+            return new WebClient(botModel, memory, botApiHandler);
         default:
-            return new TerminalClient(botModel, embeddingModel, memory, botApiHandler);
+            return new TerminalClient(botModel, memory, botApiHandler);
     }
 }
 
@@ -81,7 +80,7 @@ if (settings.bot_backend === 'openai') {
 const memory = new RedisMemory(
     settings.redis_host,
     settings.redis_port,
-    embeddingModel.embedding_dimension,
+    embeddingModel,
     `idx:${settings.bot_name}:memory`
 );
 
@@ -95,17 +94,10 @@ const browser = await startBrowser(true);
 const speech = new SpeechApi(browser);
 
 // Create the Bot API Handler
-const botApiHandler = new CommandApi(botModel, embeddingModel, memory, browser);
+const botApiHandler = new CommandApi(botModel, memory, browser);
 
 // Create the Bot client
-const botClient: BotClient = createClient(
-    command,
-    botModel,
-    embeddingModel,
-    memory,
-    speech,
-    botApiHandler
-);
+const botClient: BotClient = createClient(command, botModel, memory, speech, botApiHandler);
 
 // Normal exit
 process.on('beforeExit', async () => {

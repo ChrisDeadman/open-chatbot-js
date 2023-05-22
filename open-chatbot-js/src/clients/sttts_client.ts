@@ -3,7 +3,6 @@ import { SpeechApi } from '../bot_api/speech_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
 import { ConvMessage } from '../models/conv_message.js';
-import { EmbeddingModel } from '../models/embedding_model.js';
 import { settings } from '../settings.js';
 import { CyclicBuffer } from '../utils/cyclic_buffer.js';
 import { BotClient } from './bot_client.js';
@@ -22,13 +21,12 @@ export class STTTSClient extends BotClient {
 
     constructor(
         botModel: BotModel,
-        embeddingModel: EmbeddingModel,
         memory: MemoryProvider,
         speech: SpeechApi,
         botApiHandler: CommandApi,
         username = 'User'
     ) {
-        super(botModel, embeddingModel, memory, botApiHandler);
+        super(botModel, memory, botApiHandler);
         this.speech = speech;
         this.username = username;
         this.conversation = new CyclicBuffer(settings.message_history_size);

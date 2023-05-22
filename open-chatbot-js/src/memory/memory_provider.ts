@@ -1,7 +1,9 @@
+import { ConvMessage } from "../models/conv_message.js";
+
 export abstract class MemoryProvider {
-    abstract add(vector: number[], data: string): Promise<void>;
-    abstract del(vector: number[]): Promise<void>;
-    abstract get(vector: number[], numRelevant: number): Promise<string[]>;
+    abstract add(context: ConvMessage[], data: string): Promise<void>;
+    abstract del(context: ConvMessage[], data: string): Promise<void>;
+    abstract get(context: ConvMessage[], numRelevant: number): Promise<string[]>;
     abstract getStats(): Promise<string>;
     abstract clear(): Promise<void>;
 }
