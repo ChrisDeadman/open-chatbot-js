@@ -3,6 +3,7 @@ import { Browser, Page } from 'puppeteer';
 import { settings } from '../settings.js';
 
 import { BotModel } from '../models/bot_model.js';
+import { ConvMessage } from '../utils/conv_message.js';
 
 class PageData {
     url: string;
@@ -133,25 +134,21 @@ export class BotBrowser {
                 // Wait a bit so messages can be sent in between the requests
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 const messages = [
-                    {
-                        role: 'system',
-                        sender: 'system',
-                        content: settings.bot_browser_prompt
+                    new ConvMessage(
+                        'system',
+                        'system',
+                        settings.bot_browser_prompt
                             .join('\n')
                             .replaceAll('$BOT_NAME', this.botModel.name)
                             .replaceAll('$QUESTION', question)
-                            .replaceAll('$LANGUAGE', language),
-                    },
-                    {
-                        role: 'assistant',
-                        sender: this.botModel.name,
-                        content: `Summary:\n${pageData.summary}`,
-                    },
-                    {
-                        role: 'system',
-                        sender: 'system',
-                        content: `Content:\n${pageData.content.shift()}`,
-                    },
+                            .replaceAll('$LANGUAGE', language)
+                    ),
+                    new ConvMessage(
+                        'assistant',
+                        this.botModel.name,
+                        `Summary:\n${pageData.summary}`
+                    ),
+                    new ConvMessage('system', 'system', `Content:\n${pageData.content.shift()}`),
                 ];
                 pageData.summary = (await this.botModel.chat(messages))
                     .replaceAll('Summary:', '')

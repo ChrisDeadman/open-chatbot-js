@@ -1,13 +1,9 @@
 import axios from 'axios';
-import { Browser } from 'puppeteer';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
-import { ConvMessage } from '../models/conv_message.js';
 import { settings } from '../settings.js';
-import { dateTimeToStr } from '../utils/conversion_utils.js';
+import { ConvMessage } from '../utils/conv_message.js';
 import { BotBrowser } from './bot_browser.js';
-
-export const DEFAULT_COMMAND_RESPONSE = 'No action performed.';
 
 export enum Command {
     Nop = 'nop',
@@ -19,13 +15,13 @@ export enum Command {
 
 export class CommandApi {
     botModel: BotModel;
-    botBrowser: BotBrowser;
+    botBrowser?: BotBrowser;
     memory: MemoryProvider;
 
-    constructor(botModel: BotModel, memory: MemoryProvider, browser: Browser) {
+    constructor(botModel: BotModel, memory: MemoryProvider, botBrowser?: BotBrowser) {
         this.botModel = botModel;
         this.memory = memory;
-        this.botBrowser = new BotBrowser(botModel, browser);
+        this.botBrowser = botBrowser;
     }
 
     async handleRequest(
@@ -42,45 +38,47 @@ export class CommandApi {
         try {
             switch (commandArgs.command) {
                 case Command.StoreMemory: {
-                    const data = `from ${dateTimeToStr(new Date(), settings.locale)}: ${
-                        commandArgs.data
-                    }`;
-                    if (memContext.length > 0) {
-                        await this.memory.add(memContext, data);
+                    if ('data' in commandArgs && memContext.length > 0) {
+                        await this.memory.add(memContext, String(commandArgs.data));
                     }
                     break;
                 }
                 case Command.DeleteMemory: {
-                    await this.memory.del(memContext, commandArgs.data);
+                    if ('data' in commandArgs && memContext.length > 0) {
+                        await this.memory.del(memContext, String(commandArgs.data));
+                    }
                     break;
                 }
                 case Command.BrowseWebsite: {
-                    response = 'ERROR: Your browser is broken.';
-                    const question =
-                        typeof commandArgs.question === 'string' &&
-                        commandArgs.question.trim() !== ''
-                            ? commandArgs.question
-                            : 'what is on the website?';
-                    const pageData = await this.botBrowser.getPageData(
-                        commandArgs.url,
-                        question,
-                        language
-                    );
-                    response = pageData.summary;
+                    if (this.botBrowser) {
+                        const question =
+                            typeof commandArgs.question === 'string' &&
+                            commandArgs.question.trim() !== ''
+                                ? commandArgs.question
+                                : 'what is on the website?';
+                        const pageData = await this.botBrowser.getPageData(
+                            commandArgs.url,
+                            question,
+                            language
+                        );
+                        response = pageData.summary;
+                    } else {
+                        response = 'ERROR: browser is broken.';
+                    }
                     break;
                 }
                 case Command.Python: {
-                    const completion = await axios.post(
-                        `http://${settings.python_executor_host}:${settings.python_executor_port}/execute`,
-                        String(commandArgs.data),
-                        {
+                    if ('data' in commandArgs) {
+                        const url = `http://${settings.python_executor_host}:${settings.python_executor_port}/execute`;
+                        const config = {
                             headers: {
                                 'Content-Type': 'text/plain',
                             },
                             timeout: settings.browser_timeout,
-                        }
-                    );
-                    response = String(completion.data);
+                        };
+                        const completion = await axios.post(url, String(commandArgs.data), config);
+                        response = String(completion.data);
+                    }
                     break;
                 }
                 default: {

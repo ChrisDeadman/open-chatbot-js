@@ -131,15 +131,17 @@ dist
 
 # custom
 .venv/
-package-lock.json
+*-lock.*
 *.crx
 data/*
 !data/audio/
 !data/browser_extensions/
-!data/settings.example.*.json
+!data/persistent/
 data/audio/*
 !data/audio/README.md
 data/browser_extensions/*
 !data/browser_extensions/README.md
 !data/images/
+data/persistent/*
+!data/persistent/settings.example.*.json
 !data/web_client/

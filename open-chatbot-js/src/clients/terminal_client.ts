@@ -2,8 +2,9 @@ import readline from 'readline';
 import { CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
-import { ConvMessage } from '../models/conv_message.js';
+import { TokenModel } from '../models/token_model.js';
 import { settings } from '../settings.js';
+import { ConvMessage } from '../utils/conv_message.js';
 import { CyclicBuffer } from '../utils/cyclic_buffer.js';
 import { BotClient } from './bot_client.js';
 
@@ -16,11 +17,12 @@ export class TerminalClient extends BotClient {
 
     constructor(
         botModel: BotModel,
+        tokenModel: TokenModel,
         memory: MemoryProvider,
         botApiHandler: CommandApi,
         username = 'User'
     ) {
-        super(botModel, memory, botApiHandler);
+        super(botModel, tokenModel, memory, botApiHandler);
         this.username = username;
         this.conversation = new CyclicBuffer(settings.message_history_size);
     }
@@ -64,11 +66,7 @@ export class TerminalClient extends BotClient {
                 line = line.trim();
                 if (line.length > 0) {
                     // Add new message to conversation
-                    this.conversation.push({
-                        role: 'user',
-                        sender: this.username,
-                        content: `${line}`,
-                    });
+                    this.conversation.push(new ConvMessage('user', this.username, `${line}`));
 
                     // Chat with bot
                     await this.chat(this.conversation, settings.default_language);

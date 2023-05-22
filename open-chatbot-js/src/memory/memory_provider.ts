@@ -1,4 +1,4 @@
-import { ConvMessage } from "../models/conv_message.js";
+import { ConvMessage } from "../utils/conv_message.js";
 
 export abstract class MemoryProvider {
     abstract add(context: ConvMessage[], data: string): Promise<void>;

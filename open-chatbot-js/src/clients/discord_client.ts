@@ -15,7 +15,8 @@ import { Routes } from 'discord-api-types/v9';
 import { CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
-import { ConvMessage } from '../models/conv_message.js';
+import { TokenModel } from '../models/token_model.js';
+import { ConvMessage } from '../utils/conv_message.js';
 import { CyclicBuffer } from '../utils/cyclic_buffer.js';
 import { BotClient } from './bot_client.js';
 
@@ -28,8 +29,13 @@ export class DiscordClient extends BotClient {
     } = {};
     private typingTimeout: NodeJS.Timeout | undefined;
 
-    constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: CommandApi) {
-        super(botModel, memory, botApiHandler);
+    constructor(
+        botModel: BotModel,
+        tokenModel: TokenModel,
+        memory: MemoryProvider,
+        botApiHandler: CommandApi
+    ) {
+        super(botModel, tokenModel, memory, botApiHandler);
         this.client = new Client({
             intents: [
                 GatewayIntentBits.Guilds,
@@ -168,14 +174,11 @@ export class DiscordClient extends BotClient {
 
             console.log('Generating status message...');
             const convContext = [
-                {
-                    role: 'system',
-                    sender: 'system',
-                    content: settings.status_prompt.replaceAll(
-                        '$LANGUAGE',
-                        settings.default_language
-                    ),
-                },
+                new ConvMessage(
+                    'system',
+                    'system',
+                    settings.status_prompt.replaceAll('$LANGUAGE', settings.default_language)
+                ),
             ];
             const messages = await this.getMessages(convContext, [], settings.default_language);
             const response = await this.botModel.chat(messages);
@@ -214,11 +217,9 @@ export class DiscordClient extends BotClient {
             const conversation = this.getConversation(message.channel.id);
 
             // Add message to the channel
-            conversation.messages.push({
-                role: 'user',
-                sender: message.author.username,
-                content: message.content,
-            });
+            conversation.messages.push(
+                new ConvMessage('user', message.author.username, message.content)
+            );
             console.log(`[${message.channelId}] ${message.author.username}: ${message.content}`);
 
             // Add attachment text to the channel messages
@@ -234,11 +235,13 @@ export class DiscordClient extends BotClient {
                             const response = await fetch(attachment.url);
                             const textContent = await response.text();
                             // Add the attachment text to the channel messages
-                            conversation.messages.push({
-                                role: 'user',
-                                sender: message.author.username,
-                                content: `file <${attachment.name}>:\n${textContent}`,
-                            });
+                            conversation.messages.push(
+                                new ConvMessage(
+                                    'user',
+                                    message.author.username,
+                                    `file <${attachment.name}>:\n${textContent}`
+                                )
+                            );
                             console.log(
                                 `[${message.channelId}] ${message.author.username}: file <${attachment.name}>`
                             );
