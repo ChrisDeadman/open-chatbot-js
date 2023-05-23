@@ -6,7 +6,7 @@ import { settings } from '../settings.js';
 import { ConvMessage } from '../utils/conv_message.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { CyclicBuffer } from '../utils/cyclic_buffer.js';
-import { fixAndParseJson } from '../utils/json_utils.js';
+import { commandToString, parseCommandBlock, parseJsonCommands } from '../utils/parsing_utils.js';
 
 export abstract class BotClient {
     public botModel: BotModel;
@@ -62,23 +62,37 @@ export abstract class BotClient {
             const responseData = this.parseResponse(response);
 
             // store the bot response
-            if (responseData.message.length > 0) {
-                conversation.push(
-                    new ConvMessage('assistant', this.botModel.name, responseData.message)
-                );
-            }
+            conversation.push(
+                new ConvMessage(
+                    'assistant',
+                    this.botModel.name,
+                    responseData.message.length > 0
+                        ? responseData.message
+                        : commandToString({ command: 'nop' })
+                )
+            );
 
             // Execute commands
             if (allowCommands && responseData.commands.length > 0) {
                 responseData.commands.forEach((cmd: Record<string, string>) => {
-                    // Clear message upon NOP command
-                    if (cmd.command === Command.Nop) {
+                    // Clear message upon empty NOP command
+                    if (
+                        responseData.commands.length < 2 &&
+                        cmd.command === Command.Nop &&
+                        (!('data' in cmd) || cmd.data.length <= 0)
+                    ) {
                         responseData.message = '';
                     }
                     this.botApiHandler.handleRequest(cmd, memContext, language).then(result => {
                         // Add API response to system messages when finished
                         if (result.length > 0) {
-                            conversation.push(new ConvMessage('system', 'system', result));
+                            conversation.push(
+                                new ConvMessage(
+                                    'system',
+                                    'system',
+                                    result.slice(0, this.tokenModel.maxTokens / 4) // limit text
+                                )
+                            );
                             this.handleResponse(context, result);
                         }
                     });
@@ -130,7 +144,11 @@ export abstract class BotClient {
         }
 
         // add most recent messages, save some tokens for the response
-        const messagesLimited = await this.tokenModel.truncateMessages(conversation, -512);
+        const currentTokens = await this.tokenModel.tokenize(messages);
+        const messagesLimited = await this.tokenModel.truncateMessages(
+            conversation,
+            -(currentTokens.length + 512)
+        );
         messagesLimited.forEach(m => messages.push(m));
 
         return messages;
@@ -146,66 +164,37 @@ export abstract class BotClient {
         // Strip excess newlines
         response = response.replaceAll('\r', '\n').replaceAll(/(\s*\n){2,}/g, '\n');
 
-        let commands: any[] = [];
+        const commands: Record<string, string>[] = [];
 
         // Check each code segment for commands
         for (const match of [...response.matchAll(/[`]+([^`]+)[`]+/g)]) {
-            const new_cmds = this.parseCommand(match[1]);
+            const new_cmds: Record<string, string>[] = [];
+            const command = parseCommandBlock(match[1]);
+            if (command) {
+                new_cmds.push(command);
+            } else {
+                new_cmds.push(...parseJsonCommands(match[1]));
+            }
             if (new_cmds.length > 0) {
                 // Add to the parsed command list
-                commands = commands.concat(new_cmds);
+                commands.push(...new_cmds);
                 // Replace commands with parsed commands in the response
                 // This aids the model in keeping consistent formatting
-                if (new_cmds.length > 1 || new_cmds[0].command != Command.Python) {
+                const useJson = false;
+                if (useJson) {
                     response = response.replace(
                         match[0],
-                        new_cmds.map((cmd: any) => `\`${JSON.stringify(cmd)}\``).join('\n')
+                        new_cmds.map(cmd => `\`${JSON.stringify(cmd)}\``).join('\n')
                     );
                 } else {
                     response = response.replace(
                         match[0],
-                        `\`\`\`${new_cmds[0].command}\n${new_cmds[0].data}\n\`\`\`\n`
+                        new_cmds.map(cmd => commandToString(cmd)).join('\n')
                     );
                 }
             }
         }
 
-        return { message: response, commands: commands };
-    }
-
-    private parseCommand(response: string): Record<string, string>[] {
-        const commands: Record<string, string>[] = [];
-
-        // Match code-block types with commands
-        const cmd = response
-            .trimStart()
-            .match(new RegExp(`^(${Object.values(Command).join('|')})\\s*([\\s\\S]+)`, 'i'));
-        if (cmd) {
-            return [{ command: cmd[1], data: cmd[2] }];
-        }
-
-        try {
-            // Fix and parse json
-            let responseData = fixAndParseJson(response);
-
-            // Not a command response
-            if (typeof responseData === 'string') {
-                return commands;
-            }
-
-            // Combine multiple responses
-            if (!Array.isArray(responseData)) {
-                responseData = [responseData];
-            }
-            responseData.forEach((r: Record<string, string>) => {
-                if ('command' in r) {
-                    commands.push(r);
-                }
-            });
-        } catch (error) {
-            // ignore
-        }
-
-        return commands;
+        return { message: response, commands: [...new Set(commands)] };
     }
 }

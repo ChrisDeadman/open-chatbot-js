@@ -78,7 +78,7 @@ export class LlamaEmbedding extends TokenModel implements EmbeddingModel {
             topP: 0.1,
             topK: 40,
             typicalP: 1.0,
-            repeatPenalty: 1.15,
+            repeatPenalty: 1.18,
             nTokPredict: 512,
             nThreads: 16,
         };

@@ -38,14 +38,22 @@ export class CommandApi {
         try {
             switch (commandArgs.command) {
                 case Command.StoreMemory: {
-                    if ('data' in commandArgs && memContext.length > 0) {
-                        await this.memory.add(memContext, String(commandArgs.data));
+                    if (
+                        'data' in commandArgs &&
+                        commandArgs.data.length > 0 &&
+                        memContext.length > 0
+                    ) {
+                        await this.memory.add(memContext, commandArgs.data);
                     }
                     break;
                 }
                 case Command.DeleteMemory: {
-                    if ('data' in commandArgs && memContext.length > 0) {
-                        await this.memory.del(memContext, String(commandArgs.data));
+                    if (
+                        'data' in commandArgs &&
+                        commandArgs.data.length > 0 &&
+                        memContext.length > 0
+                    ) {
+                        await this.memory.del(memContext, commandArgs.data);
                     }
                     break;
                 }
@@ -56,6 +64,8 @@ export class CommandApi {
                             commandArgs.question.trim() !== ''
                                 ? commandArgs.question
                                 : 'what is on the website?';
+                        if (!('url' in commandArgs))
+                            [(commandArgs.url = String(commandArgs.data).split('\n')[0])];
                         const pageData = await this.botBrowser.getPageData(
                             commandArgs.url,
                             question,
@@ -68,7 +78,7 @@ export class CommandApi {
                     break;
                 }
                 case Command.Python: {
-                    if ('data' in commandArgs) {
+                    if ('data' in commandArgs && commandArgs.data.length > 0) {
                         const url = `http://${settings.python_executor_host}:${settings.python_executor_port}/execute`;
                         const config = {
                             headers: {
