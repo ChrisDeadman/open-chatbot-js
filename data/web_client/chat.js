@@ -99,6 +99,29 @@ function appendMessage(messageText, iconClass, messageClass) {
   // parse markdown and append message
   const markedContent = document.createElement("div");
   markedContent.innerHTML = marked.parse(messageText);
+
+  // find all code elements and prepend language title
+  markedContent.querySelectorAll("code").forEach(function (code) {
+    code.classList.add("hljs", "rounded");
+    const languageClass = Array.from(code.classList).find((cls) =>
+      cls.startsWith("language-")
+    );
+    if (languageClass) {
+      const languageTitle = document.createElement("div");
+      languageTitle.textContent = languageClass.replace("language-", "");
+      languageTitle.classList.add(
+        "d-inline-block",
+        "bg-dark",
+        "text-warning",
+        "small",
+        "rounded",
+        "px-1",
+        "mb-0"
+      );
+      code.parentNode.insertBefore(languageTitle, code);
+    }
+  });
+
   const message = createMessage(markedContent, iconClass, messageClass);
   messages.appendChild(message);
   messages.scrollTop = messages.scrollHeight;
