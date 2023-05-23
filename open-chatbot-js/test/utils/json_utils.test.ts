@@ -1,4 +1,4 @@
-import { fixAndParseJson } from '../../src/utils/json_utils';
+import { fixAndParseJson } from '../../src/utils/json_utils.js';
 
 describe('TestJsonUtils', () => {
     test('test_valid_json', () => {

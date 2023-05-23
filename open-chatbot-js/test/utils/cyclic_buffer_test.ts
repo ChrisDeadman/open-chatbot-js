@@ -1,4 +1,4 @@
-import { CyclicBuffer } from '../../src/utils/cyclic_buffer';
+import { CyclicBuffer } from '../../src/utils/cyclic_buffer.js';
 
 describe('CyclicBuffer', () => {
     let cyclicBuffer: CyclicBuffer<number>;

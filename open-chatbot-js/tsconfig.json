@@ -2,8 +2,8 @@
     "compilerOptions": {
         "target": "ES2022",
         "types": ["node", "jest"],
-        "module": "ES2022",
-        "lib": ["ES2022"],
+        "module": "ESNext",
+        "lib": ["ESNext"],
         "outDir": "./dist",
         "moduleResolution": "node",
         "strict": true,
@@ -18,5 +18,5 @@
         "allowSyntheticDefaultImports": true,
         "forceConsistentCasingInFileNames": true
     },
-    "exclude": ["dist", "node_modules"]
+    "exclude": ["node_modules", "dist"]
 }
