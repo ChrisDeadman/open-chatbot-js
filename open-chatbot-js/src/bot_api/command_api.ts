@@ -6,7 +6,7 @@ import { ConvMessage } from '../utils/conv_message.js';
 import { BotBrowser } from './bot_browser.js';
 
 export enum Command {
-    Nop = 'nop',
+    Thought = 'thought',
     StoreMemory = 'store_memory',
     DeleteMemory = 'delete_memory',
     BrowseWebsite = 'browse_website',
@@ -31,7 +31,7 @@ export class CommandApi {
     ): Promise<string> {
         let response = '';
 
-        if (commandArgs.command.length <= 0 || commandArgs.command === Command.Nop) {
+        if (commandArgs.command.length <= 0 || commandArgs.command === Command.Thought) {
             return response;
         }
 

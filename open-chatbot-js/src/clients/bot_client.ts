@@ -61,26 +61,18 @@ export abstract class BotClient {
             const responseData = this.parseResponse(response);
 
             // store the bot response
-            conversation.push(
-                new ConvMessage(
-                    'assistant',
-                    this.botModel.name,
-                    responseData.message.length > 0
-                        ? responseData.message
-                        : commandToString({ command: 'nop' })
-                )
-            );
+            if (responseData.message.length > 0) {
+                conversation.push(
+                    new ConvMessage('assistant', this.botModel.name, responseData.message)
+                );
+            }
 
             // Execute commands
             if (allowCommands && responseData.commands.length > 0) {
                 responseData.commands.forEach((cmd: Record<string, string>) => {
-                    // Clear message upon empty NOP command
-                    if (
-                        responseData.commands.length < 2 &&
-                        cmd.command === Command.Nop &&
-                        (!('data' in cmd) || cmd.data.length <= 0)
-                    ) {
-                        responseData.message = '';
+                    // Replace message with thought
+                    if (responseData.commands.length < 2 && cmd.command === Command.Thought) {
+                        responseData.message = 'data' in cmd ? `*${cmd.data.trim()}*` : '';
                     }
                     this.botApiHandler.handleRequest(cmd, memContext, language).then(result => {
                         // Add API response to system messages when finished
@@ -89,7 +81,7 @@ export abstract class BotClient {
                                 new ConvMessage(
                                     'system',
                                     'system',
-                                    result.slice(0, this.tokenModel.maxTokens / 4) // limit text
+                                    result.slice(0, this.tokenModel.maxTokens / 2) // limit text
                                 )
                             );
                             this.handleResponse(context, result);
@@ -118,20 +110,20 @@ export abstract class BotClient {
     ): Promise<ConvMessage[]> {
         const messages: ConvMessage[] = [];
 
-        // format initial prompt
-        const initialPromptTemplate = new PromptTemplate({
+        // format prefix
+        const prefixTemplate = new PromptTemplate({
             inputVariables: [...Object.keys(settings), 'now'],
             template: settings.prompt_templates.prefix.join('\n'),
         });
-        const initialPrompt = await initialPromptTemplate.format({
+        const prefix = await prefixTemplate.format({
             ...settings,
             language: language,
             now: dateTimeToStr(new Date(), settings.locale),
         });
 
-        // add initial prompt to the context
-        if (initialPrompt.length >= 0) {
-            messages.push(new ConvMessage('system', 'system', initialPrompt));
+        // add prefix to the context
+        if (prefix.length >= 0) {
+            messages.push(new ConvMessage('system', 'system', prefix));
         }
 
         if (memoryContext.length > 0) {

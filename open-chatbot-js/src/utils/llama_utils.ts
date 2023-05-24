@@ -7,16 +7,18 @@ export function buildStoppingStrings(messages: ConvMessage[]): string[] {
         )
     );
     return [
-        '<START>',
-        '</s>',
-        '<END>',
-        '</END>',
-        '<USER>',
-        '\nU:',
-        '\nUser:',
-        '\nSystem:',
-        '\n### Instruction:',
-    ].concat(senders.map(s => `\n${s}:`));
+        ...new Set(
+            [
+                '<START>',
+                '</START>',
+                '<END>',
+                '</END>',
+                '<USER>',
+                '</USER>',
+                '\n### ',
+            ].concat(senders.map(s => `\n${s}:`))
+        ),
+    ];
 }
 
 export function filterResponse(response: string, stoppingStrings: string[]): string {
@@ -28,17 +30,20 @@ export function filterResponse(response: string, stoppingStrings: string[]): str
         'gi'
     );
     const removeTrailingStop = new RegExp(
-        `(###)*\\s*(<|>|${stoppingStrings
+        `(###)*\\s*(<|>|</s>|${stoppingStrings
             .map(s => s.replaceAll('\n', ''))
             .map(s => s.slice(0, s.length - 1))
             .join('|')})+[:]*\\s*$`,
         'gi'
     );
-    return response
+    const filtered = response
         .replaceAll('\\\\_', '_')
         .replaceAll('\\_', '_')
-        .replaceAll('�', '')
+        .replaceAll('​', '')
+        .replaceAll('​�', '')
+        .replace(/^\s*(?!\d)\p{Emoji}/u, '')
         .replace(removeAfterStop, '')
         .replace(removeTrailingStop, '')
         .trim();
+    return filtered;
 }

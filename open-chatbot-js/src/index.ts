@@ -19,6 +19,7 @@ import { WebClient } from './clients/web_client.js';
 import { MemoryProvider } from './memory/memory_provider.js';
 import { RedisMemory } from './memory/redis_memory_provider.js';
 import { EmbeddingModel } from './models/embedding_model.js';
+import { LlamaBot } from './models/llama_bot.js';
 import { LlamaEmbedding } from './models/llama_embedding.js';
 import { TokenModel } from './models/token_model.js';
 import { SbertEmbedding } from './models/sbert_embedding.js';
@@ -80,16 +81,28 @@ switch (settings.bot_backend) {
         embeddingModel = openAiBot;
         break;
     }
-    /*case 'webui':
-        botModel = new WebUIBot(settings.bot_name, settings.bot_model);
-        break;*/
-    default:
+    case 'webui':
         botModel = new WebUIBot(
             settings.bot_name,
             settings.bot_model,
             settings.bot_model_token_limit
         );
         break;
+    default: {
+        if (!fs.existsSync(settings.bot_model)) {
+            throw new Error(
+                `${settings.bot_model} does not exist, please check settings.json.`
+            );
+        }
+        const llamaBot = new LlamaBot(
+            settings.bot_name,
+            settings.bot_model,
+            settings.bot_model_token_limit
+        );
+        await llamaBot.init();
+        botModel = llamaBot;
+        break;
+    }
 }
 switch (settings.embedding_backend) {
     case 'openai': {

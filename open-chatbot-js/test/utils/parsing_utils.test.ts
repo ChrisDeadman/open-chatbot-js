@@ -2,17 +2,17 @@ import { commandToString, parseCommandBlock } from '../../src/utils/parsing_util
 
 describe('TestParsingUtils', () => {
     test('can parse command with no args', () => {
-        const command = 'nop';
-        expect(parseCommandBlock(command)).toEqual({ command: 'nop', data: '' });
+        const command = 'thought';
+        expect(parseCommandBlock(command)).toEqual({ command: 'thought', data: '' });
     });
 
-    test('can parse garbage commands', () => {
+    test('can parse thought commands', () => {
         const command = [
-            'nop',
+            'thought',
             'browse_website "https://www.nasa.gov/image/epic/latest/full/Earth-from-Space-20210414-0123-GMT-20210414_1280.jpg"',
         ].join('\n');
         expect(parseCommandBlock(command)).toEqual({
-            command: 'nop',
+            command: 'thought',
             data: 'browse_website "https://www.nasa.gov/image/epic/latest/full/Earth-from-Space-20210414-0123-GMT-20210414_1280.jpg"',
         });
     });

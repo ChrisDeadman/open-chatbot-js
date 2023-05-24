@@ -37,10 +37,11 @@ Chatbot with a 'sort-of' long-term memory 🧠 with [Text generation web UI](htt
 
 ## 🛠️ Configuration
 
-- **[Text generation web UI Example](data/settings.example.webui.json)**
-- **[OpenAI Example](data/settings.example.openai.json)**
+- **[llama-node Example](data/persistent/settings.example.llama.json)**
+- **[Text generation web UI Example](data/persistent/settings.example.webui.json)**
+- **[OpenAI Example](data/persistent/settings.example.openai.json)**
 
-Copy an example configuration from `data/settings.example.*.json` to `data/settings.json`.
+Copy an example configuration from `data/persistent/settings.example.*.json` to `data/persistent/settings.json`.
 
 ## 🚀 Build and run docker image
 

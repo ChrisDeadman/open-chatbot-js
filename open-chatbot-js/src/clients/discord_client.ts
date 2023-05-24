@@ -176,7 +176,7 @@ export class DiscordClient extends BotClient {
 
             console.log('Generating status message...');
 
-            // format initial prompt
+            // format status prompt
             const statusPromptTemplate = new PromptTemplate({
                 inputVariables: [...Object.keys(settings), 'now'],
                 template: settings.prompt_templates.status_prompt,
