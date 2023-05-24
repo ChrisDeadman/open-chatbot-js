@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { settings } from '../settings.js';
-import { ConvMessage } from '../utils/conv_message.js';
+import { ConvMessage, buildPrompt } from '../utils/conv_message.js';
 import { buildStoppingStrings, filterResponse } from '../utils/llama_utils.js';
 import { BotModel } from './bot_model.js';
 
@@ -16,7 +16,7 @@ export class WebUIBot implements BotModel {
     }
 
     async chat(messages: ConvMessage[]): Promise<string> {
-        const prompt = messages.map(m => m.toString()).join('\n') + `\n${this.name}:`;
+        const prompt = await buildPrompt(messages);
         const stoppingStrings = buildStoppingStrings(messages);
 
         console.debug(`WebUI: chat with ${messages.length} messages...`);

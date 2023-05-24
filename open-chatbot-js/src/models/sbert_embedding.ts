@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { EmbeddingModel } from './embedding_model.js';
 import { TokenModel } from './token_model.js';
-import { ConvMessage } from '../utils/conv_message.js';
+import { ConvMessage, buildPrompt } from '../utils/conv_message.js';
 import { TiktokenModel, encoding_for_model } from '@dqbd/tiktoken';
 
 export class SbertEmbedding extends TokenModel implements EmbeddingModel {
@@ -20,7 +20,7 @@ export class SbertEmbedding extends TokenModel implements EmbeddingModel {
             return [];
         }
 
-        const content = messages.map(m => m.toString()).join('\n');
+        const content = await buildPrompt(messages);
 
         // TODO proper tokenizing
         const enc = encoding_for_model('text-embedding-ada-002' as TiktokenModel);
@@ -39,7 +39,7 @@ export class SbertEmbedding extends TokenModel implements EmbeddingModel {
         console.debug(`SbertEmbedding: createEmbedding with ${messages.length} messages...`);
         const startTime = Date.now();
 
-        const prompt = messages.map(m => `${m.sender}: ${m.content}`).join('\n');
+        const prompt = await buildPrompt(messages);
         const output = await this.runPythonScript('utils/sbert-embedding.py', [
             '--model',
             `"${this.model}"`,

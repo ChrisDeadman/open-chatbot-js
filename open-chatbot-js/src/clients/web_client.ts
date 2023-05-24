@@ -29,7 +29,7 @@ export class WebClient extends BotClient {
     ) {
         super(botModel, tokenModel, memory, botApiHandler);
         this.username = username;
-        this.language = settings.default_language;
+        this.language = settings.language;
         this.conversation = new CyclicBuffer(settings.message_history_size);
 
         this.app = express();
@@ -50,8 +50,7 @@ export class WebClient extends BotClient {
                 username: this.username,
                 botname: this.botModel.name,
                 language: this.language,
-                initialPrompt: this.initialPrompt,
-                botBrowserPrompt: settings.bot_browser_prompt.join('\n'),
+                prompt_templates: settings.prompt_templates,
             });
         });
 
@@ -78,8 +77,8 @@ export class WebClient extends BotClient {
                 this.botModel.name = settings.botname;
                 this.language = settings.language;
             });
-            socket.on('update prompt', async settings => {
-                this.initialPrompt = settings.initialPrompt;
+            socket.on('update prompt', async prompt_templates => {
+                settings.prompt_templates = prompt_templates;
             });
         });
 

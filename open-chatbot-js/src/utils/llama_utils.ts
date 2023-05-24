@@ -30,7 +30,7 @@ export function filterResponse(response: string, stoppingStrings: string[]): str
     const removeTrailingStop = new RegExp(
         `(###)*\\s*(<|>|${stoppingStrings
             .map(s => s.replaceAll('\n', ''))
-            .map(s => s.substring(0, s.length - 1))
+            .map(s => s.slice(0, s.length - 1))
             .join('|')})+[:]*\\s*$`,
         'gi'
     );

@@ -1,7 +1,7 @@
 import type { Generate } from '@llama-node/llama-cpp';
 import { LLM } from 'llama-node';
 import { LLamaCpp, type LoadConfig } from 'llama-node/dist/llm/llama-cpp.js';
-import { ConvMessage } from '../utils/conv_message.js';
+import { ConvMessage, buildPrompt } from '../utils/conv_message.js';
 import { EmbeddingModel } from './embedding_model.js';
 import { TokenModel } from './token_model.js';
 
@@ -47,7 +47,7 @@ export class LlamaEmbedding extends TokenModel implements EmbeddingModel {
             return [];
         }
 
-        const content = messages.map(m => m.toString()).join('\n');
+        const content = await buildPrompt(messages);
         return this.llm.tokenize(content);
     }
 
@@ -59,7 +59,7 @@ export class LlamaEmbedding extends TokenModel implements EmbeddingModel {
         console.debug(`LlamaEmbedding: createEmbedding with ${messages.length} messages...`);
         const startTime = Date.now();
 
-        const prompt = messages.map(m => m.toString()).join('\n');
+        const prompt = await buildPrompt(messages);
         const params = this.buildParams(prompt);
 
         const embedding = await this.llm.getEmbedding(params);

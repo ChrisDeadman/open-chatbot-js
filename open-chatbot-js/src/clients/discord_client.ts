@@ -12,11 +12,13 @@ import { fileURLToPath } from 'node:url';
 
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v9';
+import { PromptTemplate } from 'langchain/prompts';
 import { CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
 import { TokenModel } from '../models/token_model.js';
 import { ConvMessage } from '../utils/conv_message.js';
+import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { CyclicBuffer } from '../utils/cyclic_buffer.js';
 import { BotClient } from './bot_client.js';
 
@@ -156,7 +158,7 @@ export class DiscordClient extends BotClient {
         if (!(channelId in this.conversation)) {
             this.conversation[channelId] = {
                 messages: new CyclicBuffer<ConvMessage>(settings.message_history_size),
-                language: settings.default_language,
+                language: settings.language,
             };
         }
         return this.conversation[channelId];
@@ -173,14 +175,20 @@ export class DiscordClient extends BotClient {
             await this.refreshCommands();
 
             console.log('Generating status message...');
-            const convContext = [
-                new ConvMessage(
-                    'system',
-                    'system',
-                    settings.status_prompt.replaceAll('$LANGUAGE', settings.default_language)
-                ),
-            ];
-            const messages = await this.getMessages(convContext, [], settings.default_language);
+
+            // format initial prompt
+            const statusPromptTemplate = new PromptTemplate({
+                inputVariables: [...Object.keys(settings), 'now'],
+                template: settings.prompt_templates.status_prompt,
+            });
+            const statusPrompt = await statusPromptTemplate.format({
+                ...settings,
+                language: settings.language,
+                now: dateTimeToStr(new Date(), settings.locale),
+            });
+
+            const convContext = [new ConvMessage('system', 'system', statusPrompt)];
+            const messages = await this.getMessages(convContext, [], settings.language);
             const response = await this.botModel.chat(messages);
             const responseData = this.parseResponse(response);
             responseData.message = responseData.message.split('.')[0];

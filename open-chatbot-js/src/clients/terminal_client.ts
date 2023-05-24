@@ -69,7 +69,7 @@ export class TerminalClient extends BotClient {
                     this.conversation.push(new ConvMessage('user', this.username, `${line}`));
 
                     // Chat with bot
-                    await this.chat(this.conversation, settings.default_language);
+                    await this.chat(this.conversation, settings.language);
                 }
             } catch (error) {
                 console.error(error);

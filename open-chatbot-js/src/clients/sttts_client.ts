@@ -78,7 +78,7 @@ export class STTTSClient extends BotClient {
                 this.conversation.push(new ConvMessage('user', this.username, `${message}`));
 
                 // Chat with bot
-                await this.chat(this.conversation, settings.default_language);
+                await this.chat(this.conversation, settings.language);
                 this.lastMessageTime = Date.now();
             }
         } catch (error) {

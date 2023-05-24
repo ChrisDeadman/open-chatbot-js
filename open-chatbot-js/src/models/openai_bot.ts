@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Job, Queue, QueueEvents, Worker } from 'bullmq';
 import { ChatCompletionRequestMessageRoleEnum, Configuration, OpenAIApi } from 'openai';
 import { settings } from '../settings.js';
-import { ConvMessage } from '../utils/conv_message.js';
+import { ConvMessage, buildPrompt } from '../utils/conv_message.js';
 import { BotModel } from './bot_model.js';
 import { EmbeddingModel } from './embedding_model.js';
 import { TokenModel } from './token_model.js';
@@ -84,7 +84,7 @@ export class OpenAIBot extends TokenModel implements BotModel, EmbeddingModel {
     }
 
     async tokenize(messages: ConvMessage[]): Promise<number[]> {
-        const content = messages.map(m => m.toString()).join('\n');
+        const content = await buildPrompt(messages);
         const enc = encoding_for_model(this.model as TiktokenModel);
         try {
             return [...enc.encode(content)];
@@ -146,7 +146,7 @@ export class OpenAIBot extends TokenModel implements BotModel, EmbeddingModel {
     }
 
     private async _createEmbedding(messages: ConvMessage[]): Promise<number[]> {
-        const input = messages.map(msg => msg.content).join(' ');
+        const input = await buildPrompt(messages);
         const result = await this.openai.createEmbedding({
             input: input,
             model: settings.embedding_model,

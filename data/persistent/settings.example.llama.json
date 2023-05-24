@@ -1,13 +1,13 @@
 {
   "discord_bot_token": "YOUR_BOT_TOKEN",
-  "openai_api_key": "YOUR_API_KEY",
+  "openai_api_key": "NONE",
   "bot_name": "Computer",
-  "bot_backend": "openai",
-  "bot_model": "gpt-3.5-turbo",
-  "embedding_backend": "openai",
-  "embedding_model": "text-embedding-ada-002",
-  "bot_model_token_limit": 4000,
-  "bot_model_rate_limit_ms": 7500,
+  "bot_backend": "llama",
+  "bot_model": "/home/deadman/Projects/llama.cpp/models/7B/WizardLM-7B-uncensored.ggmlv3.q4_0.bin",
+  "embedding_backend": "sbert",
+  "embedding_model": "sentence-transformers/paraphrase-albert-small-v2",
+  "bot_model_token_limit": 2000,
+  "bot_model_rate_limit_ms": 0,
   "message_history_size": 50,
   "chat_process_delay_ms": 4000,
   "locale": "en-US",
@@ -71,7 +71,8 @@
       "",
       "To use a tool, incorporate the appropriate tool format into your response.",
       "",
-      "# Conversation"
+      "# Conversation",
+      "<START>"
     ],
     "status_prompt": "Please enter a status message, max. 6 words, in {language}:",
     "bot_browser_prompt": [

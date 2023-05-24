@@ -1,3 +1,4 @@
+import { PromptTemplate } from 'langchain/prompts';
 import { Command, CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
@@ -13,7 +14,6 @@ export abstract class BotClient {
     public tokenModel: TokenModel;
     public memory: MemoryProvider;
     protected botApiHandler: CommandApi;
-    protected initialPrompt: string;
 
     constructor(
         botModel: BotModel,
@@ -25,7 +25,6 @@ export abstract class BotClient {
         this.tokenModel = tokenModel;
         this.memory = memory;
         this.botApiHandler = botApiHandler;
-        this.initialPrompt = settings.initial_prompt.join('\n');
     }
 
     abstract startup(): Promise<void>;
@@ -119,10 +118,16 @@ export abstract class BotClient {
     ): Promise<ConvMessage[]> {
         const messages: ConvMessage[] = [];
 
-        const initialPrompt = this.initialPrompt
-            .replaceAll('$BOT_NAME', this.botModel.name)
-            .replaceAll('$NOW', dateTimeToStr(new Date(), settings.locale))
-            .replaceAll('$LANGUAGE', language);
+        // format initial prompt
+        const initialPromptTemplate = new PromptTemplate({
+            inputVariables: [...Object.keys(settings), 'now'],
+            template: settings.prompt_templates.prefix.join('\n'),
+        });
+        const initialPrompt = await initialPromptTemplate.format({
+            ...settings,
+            language: language,
+            now: dateTimeToStr(new Date(), settings.locale),
+        });
 
         // add initial prompt to the context
         if (initialPrompt.length >= 0) {
