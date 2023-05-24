@@ -41,7 +41,7 @@ export class WebUIBot implements BotModel {
                     typical_p: 1.0,
                     repetition_penalty: 1.18,
                     max_new_tokens: 512,
-                    truncation_length: 8192,
+                    truncation_length: this.maxTokens,
                 },
                 {
                     timeout: settings.browser_timeout,

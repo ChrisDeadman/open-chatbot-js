@@ -16,8 +16,8 @@
   "prompt_templates": {
     "system_message": "{sender}: {content}",
     "user_message": "{sender}: {content}",
-    "assistant_message": "{sender}: {content}\n\n</s>",
-    "suffix": "{bot_name}: ",
+    "assistant_message": "ASSISTANT: {content}",
+    "suffix": "ASSISTANT: ",
     "prefix": [
       "### Persona",
       "Meet the {bot_name} of a starship in the Star Trek TNG era.",
