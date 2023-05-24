@@ -15,6 +15,7 @@ export function buildStoppingStrings(messages: ConvMessage[]): string[] {
                 '</END>',
                 '<USER>',
                 '</USER>',
+                '\nUSER:',
                 '\n### ',
             ].concat(senders.map(s => `\n${s}:`))
         ),
@@ -40,8 +41,8 @@ export function filterResponse(response: string, stoppingStrings: string[]): str
         .replaceAll('\\\\_', '_')
         .replaceAll('\\_', '_')
         .replaceAll('​', '')
-        .replaceAll('​�', '')
-        .replace(/^\s*(?!\d)\p{Emoji}/u, '')
+        .replaceAll(/(?<=\p{Extended_Pictographic})\p{Extended_Pictographic}{3,}/gu, '') // Prevent emoji flood
+        .replace(/^\s*(?!\d)\p{Extended_Pictographic}/u, '') // prevent emoji at beginning of every sentence
         .replace(removeAfterStop, '')
         .replace(removeTrailingStop, '')
         .trim();

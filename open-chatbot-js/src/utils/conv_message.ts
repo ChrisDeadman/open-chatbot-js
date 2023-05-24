@@ -61,9 +61,7 @@ export async function buildPrompt(messages: ConvMessage[]): Promise<string> {
         ...settings,
         now: dateTimeToStr(new Date(), settings.locale),
     });
-    if (suffix.length > 0) {
-        prompt.push(suffix);
-    }
+    prompt.push(suffix);
 
     return prompt.join('\n');
 }

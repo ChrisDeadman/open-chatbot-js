@@ -44,7 +44,7 @@ export class LlamaBot implements BotModel {
         try {
             const stoppingStrings = buildStoppingStrings(messages);
             const prompt = await buildPrompt(messages);
-            const stopSequence = '### '; //`${messages.filter(m => m.role === 'user').at(-1)?.sender}:`;
+            const stopSequence = '</s>';
             const params = this.buildParams(prompt, stopSequence);
 
             const completion = await this.llm.createCompletion(params, () => {

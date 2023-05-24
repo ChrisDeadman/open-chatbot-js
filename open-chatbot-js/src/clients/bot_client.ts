@@ -152,14 +152,17 @@ export abstract class BotClient {
     }
 
     protected parseResponse(response: string): any {
-        // Strip the botname in case it responds with it
-        const botNamePrefix = `${this.botModel.name}:`;
-        if (response.startsWith(botNamePrefix)) {
-            response = response.slice(botNamePrefix.length);
-        }
+        // Strip end-of-previous-sentence and the bot name
+        response = response.replace(
+            new RegExp(`\\p{P}*\\n*\\s*${this.botModel.name}:\\s*`, 'u'),
+            ''
+        );
 
         // Strip excess newlines
-        response = response.replaceAll('\r', '\n').replaceAll(/(\s*\n){2,}/g, '\n');
+        response = response
+            .replaceAll('\r', '\n')
+            .replaceAll(/(\s*\n){2,}/g, '\n')
+            .trimStart();
 
         const commands: Record<string, string>[] = [];
 
