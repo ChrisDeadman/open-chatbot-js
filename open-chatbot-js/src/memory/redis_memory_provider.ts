@@ -3,15 +3,14 @@ import { SchemaFieldTypes, VectorAlgorithms, createClient } from 'redis';
 import { toFloat32Buffer } from '../utils/conversion_utils.js';
 import { MemoryProvider } from './memory_provider.js';
 
-import { ConvMessage } from '../models/conv_message.js';
 import { EmbeddingModel } from '../models/embedding_model.js';
+import { ConvMessage } from '../utils/conv_message.js';
 
 export class RedisMemory extends MemoryProvider {
     private redis: RedisClientType;
     private embeddingModel: EmbeddingModel;
     private memoryIndex: string;
     private searchPrefix: string;
-    private initComplete: Promise<void>;
 
     constructor(
         redisHost: string,
@@ -31,18 +30,14 @@ export class RedisMemory extends MemoryProvider {
                 port: redisPort,
             },
         });
-
-        this.initComplete = this.prepareDatabase();
     }
 
-    private async prepareDatabase() {
+    async init() {
         await this.redis.connect();
         await this.createIndex();
     }
 
     async add(context: ConvMessage[], data: string) {
-        await this.initComplete;
-
         const vector = await this.embeddingModel.createEmbedding(context);
         const dataDict = {
             data: data,
@@ -57,12 +52,10 @@ export class RedisMemory extends MemoryProvider {
     }
 
     async del(context: ConvMessage[], data: string) {
-        await this.initComplete;
-
         const baseQuery = `*=>[KNN 1 @embedding $vector AS dist]`;
         const vector = await this.embeddingModel.createEmbedding([
             ...context,
-            { role: 'assistant', sender: 'assistant', content: data },
+            new ConvMessage('assistant', 'assistant', data),
         ]);
         const results = await this.redis.ft.search(this.memoryIndex, baseQuery, {
             PARAMS: {
@@ -84,8 +77,6 @@ export class RedisMemory extends MemoryProvider {
     }
 
     async get(context: ConvMessage[], numRelevant = 1): Promise<string[]> {
-        await this.initComplete;
-
         const baseQuery = `*=>[KNN ${numRelevant} @embedding $vector AS dist]`;
         const vector = await this.embeddingModel.createEmbedding(context);
         const results = await this.redis.ft.search(this.memoryIndex, baseQuery, {
@@ -101,13 +92,11 @@ export class RedisMemory extends MemoryProvider {
     }
 
     async getStats(): Promise<string> {
-        await this.initComplete;
         const info = await this.redis.ft.info(this.memoryIndex);
         return JSON.stringify(info, null, 2);
     }
 
     async clear() {
-        await this.initComplete;
         await this.dropIndex();
         await this.createIndex();
     }
@@ -129,7 +118,7 @@ export class RedisMemory extends MemoryProvider {
                         type: SchemaFieldTypes.VECTOR,
                         ALGORITHM: VectorAlgorithms.HNSW,
                         TYPE: 'FLOAT32',
-                        DIM: this.embeddingModel.embedding_dimension,
+                        DIM: this.embeddingModel.dimension,
                         DISTANCE_METRIC: 'COSINE',
                     },
                 },

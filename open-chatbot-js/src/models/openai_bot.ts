@@ -1,11 +1,12 @@
+import { TiktokenModel, encoding_for_model } from '@dqbd/tiktoken';
 import axios from 'axios';
 import { Job, Queue, QueueEvents, Worker } from 'bullmq';
 import { ChatCompletionRequestMessageRoleEnum, Configuration, OpenAIApi } from 'openai';
 import { settings } from '../settings.js';
-import { countStringTokens } from '../utils/token_utils.js';
+import { ConvMessage, buildPrompt } from '../utils/conv_message.js';
 import { BotModel } from './bot_model.js';
-import { ConvMessage } from './conv_message.js';
 import { EmbeddingModel } from './embedding_model.js';
+import { TokenModel } from './token_model.js';
 
 enum JobType {
     chat = 'chat',
@@ -14,17 +15,21 @@ enum JobType {
 
 type JobData = { messages: ConvMessage[] };
 
-export class OpenAIBot implements BotModel, EmbeddingModel {
+export class OpenAIBot extends TokenModel implements BotModel, EmbeddingModel {
     name: string;
-    embedding_dimension = 1536;
+    dimension = 1536;
+    maxTokens: number;
     private openai: OpenAIApi;
     private model: string;
     private chatQueue: Queue<JobData, any>;
     private chatQueueEvents: QueueEvents;
     private worker: Worker;
 
-    constructor(name: string, openai_api_key: string, model: string) {
+    constructor(name: string, openai_api_key: string, model: string, maxTokens: number) {
+        super();
+
         this.name = name;
+        this.maxTokens = maxTokens;
         this.openai = new OpenAIApi(new Configuration({ apiKey: openai_api_key }));
         this.model = model;
 
@@ -53,24 +58,6 @@ export class OpenAIBot implements BotModel, EmbeddingModel {
         });
     }
 
-    fits(messages: ConvMessage[], tokenLimit?: number): boolean {
-        const limit =
-            tokenLimit != null
-                ? tokenLimit >= 0
-                    ? Math.min(tokenLimit, settings.bot_model_token_limit)
-                    : settings.bot_model_token_limit + tokenLimit
-                : settings.bot_model_token_limit;
-
-        const numTokens = countStringTokens(
-            messages
-                .map(this.convMessageToOpenAIMessage.bind(this))
-                .map(message => message.content),
-            this.model
-        );
-
-        return numTokens <= limit;
-    }
-
     async chat(messages: ConvMessage[]): Promise<string> {
         const job = await this.chatQueue.add(JobType.chat.toString(), {
             messages: messages,
@@ -83,30 +70,27 @@ export class OpenAIBot implements BotModel, EmbeddingModel {
     }
 
     async createEmbedding(messages: ConvMessage[]): Promise<number[]> {
-        let memContext: ConvMessage[] = [];
-        for (let i = -9; i <= 0; i += 1) {
-            memContext = messages.filter(msg => msg.role != 'system').slice(i);
-            const numTokens = countStringTokens(
-                messages
-                    .map(this.convMessageToOpenAIMessage.bind(this))
-                    .map(message => message.content),
-                settings.embedding_model
-            );
-            if (numTokens <= settings.bot_model_token_limit) {
-                break;
-            }
+        if (messages.length <= 0) {
+            return [];
         }
+        const job = await this.chatQueue.add(JobType.createEmbedding.toString(), {
+            messages,
+        });
+        const result = await job.waitUntilFinished(this.chatQueueEvents);
+        if (result === null) {
+            return [];
+        }
+        return result;
+    }
 
-        if (memContext.length > 0) {
-            const job = await this.chatQueue.add(JobType.createEmbedding.toString(), {
-                messages: memContext,
-            });
-            const result = await job.waitUntilFinished(this.chatQueueEvents);
-            if (result != null) {
-                return result;
-            }
+    async tokenize(messages: ConvMessage[]): Promise<number[]> {
+        const content = await buildPrompt(messages);
+        const enc = encoding_for_model(this.model as TiktokenModel);
+        try {
+            return [...enc.encode(content)];
+        } finally {
+            enc.free();
         }
-        return [];
     }
 
     private async processChatJob(job: Job<JobData>): Promise<any | null> {
@@ -114,6 +98,7 @@ export class OpenAIBot implements BotModel, EmbeddingModel {
         try {
             console.debug(`OpenAI: ${job.name} with ${job.data.messages.length} messages...`);
             const startTime = Date.now();
+
             switch (JobType[job.name as keyof typeof JobType]) {
                 case JobType.chat: {
                     result = await this.createChatCompletion(job.data.messages);
@@ -130,7 +115,7 @@ export class OpenAIBot implements BotModel, EmbeddingModel {
 
             const endTime = Date.now();
             const elapsedMs = endTime - startTime;
-            console.debug(`OpenAI: response received after ${elapsedMs}ms`);
+            console.debug(`OpenAI: response took ${elapsedMs}ms`);
             this.worker.rateLimit(settings.bot_model_rate_limit_ms);
         } catch (error) {
             console.error(`OpenAI: ${error}`);
@@ -161,7 +146,7 @@ export class OpenAIBot implements BotModel, EmbeddingModel {
     }
 
     private async _createEmbedding(messages: ConvMessage[]): Promise<number[]> {
-        const input = messages.map(msg => msg.content).join(' ');
+        const input = await buildPrompt(messages);
         const result = await this.openai.createEmbedding({
             input: input,
             model: settings.embedding_model,

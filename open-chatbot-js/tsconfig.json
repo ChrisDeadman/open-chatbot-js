@@ -12,7 +12,7 @@
         "declaration": true,
         "skipLibCheck": true,
         "esModuleInterop": true,
-        "isolatedModules": true,
+        "isolatedModules": false,
         "resolveJsonModule": true,
         "noFallthroughCasesInSwitch": true,
         "allowSyntheticDefaultImports": true,

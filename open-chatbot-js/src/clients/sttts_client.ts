@@ -2,8 +2,9 @@ import { CommandApi } from '../bot_api/command_api.js';
 import { SpeechApi } from '../bot_api/speech_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
-import { ConvMessage } from '../models/conv_message.js';
+import { TokenModel } from '../models/token_model.js';
 import { settings } from '../settings.js';
+import { ConvMessage } from '../utils/conv_message.js';
 import { CyclicBuffer } from '../utils/cyclic_buffer.js';
 import { BotClient } from './bot_client.js';
 
@@ -21,12 +22,13 @@ export class STTTSClient extends BotClient {
 
     constructor(
         botModel: BotModel,
+        tokenModel: TokenModel,
         memory: MemoryProvider,
         speech: SpeechApi,
         botApiHandler: CommandApi,
         username = 'User'
     ) {
-        super(botModel, memory, botApiHandler);
+        super(botModel, tokenModel, memory, botApiHandler);
         this.speech = speech;
         this.username = username;
         this.conversation = new CyclicBuffer(settings.message_history_size);
@@ -73,14 +75,10 @@ export class STTTSClient extends BotClient {
                 console.info(`${this.username}: ${message}`);
 
                 // Add new message to conversation
-                this.conversation.push({
-                    role: 'user',
-                    sender: this.username,
-                    content: `${message}`,
-                });
+                this.conversation.push(new ConvMessage('user', this.username, `${message}`));
 
                 // Chat with bot
-                await this.chat(this.conversation, settings.default_language);
+                await this.chat(this.conversation, settings.language);
                 this.lastMessageTime = Date.now();
             }
         } catch (error) {

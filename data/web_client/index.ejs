@@ -44,16 +44,32 @@
             <div class="modal-dialog" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title" id="promptModalLabel">Prompt</h5>
+                  <h5 class="modal-title" id="promptModalLabel">Prompt Templates</h5>
                 </div>
                 <form id="promptForm" class="modal-body">
                   <div class="form-group">
-                    <label for="initialPrompt" class="py-2">Initial Prompt:</label>
-                    <textarea id="initialPrompt" class="form-control py-2" rows="15"><%= initialPrompt %></textarea>
+                    <label for="systemMessage" class="py-2">System Message:</label>
+                    <textarea id="systemMessage" class="form-control py-2" rows="1"><%= prompt_templates.system_message %></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label for="userMessage" class="py-2">User Message:</label>
+                    <textarea id="userMessage" class="form-control py-2" rows="1"><%= prompt_templates.user_message %></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label for="assistantMessage" class="py-2">Assistant Message:</label>
+                    <textarea id="assistantMessage" class="form-control py-2" rows="1"><%= prompt_templates.assistant_message %></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label for="suffix" class="py-2">Suffix:</label>
+                    <textarea id="suffix" class="form-control py-2" rows="1"><%= prompt_templates.suffix %></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label for="prefix" class="py-2">Prefix:</label>
+                    <textarea id="prefix" class="form-control py-2" rows="15"><%= prompt_templates.prefix.join('\n') %></textarea>
                   </div>
                   <div class="form-group">
                     <label for="botBrowserPrompt" class="py-2">Bot-Browser Prompt:</label>
-                    <textarea id="botBrowserPrompt" class="form-control py-2" rows="10" disabled readonly><%= botBrowserPrompt %></textarea>
+                    <textarea id="botBrowserPrompt" class="form-control py-2" rows="10"><%= prompt_templates.bot_browser_prompt.join('\n') %></textarea>
                   </div>
                   <div class="modal-footer">
                     <button type="submit" class="btn btn-primary" data-bs-dismiss="modal">Save</button>

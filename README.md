@@ -10,7 +10,7 @@ Chatbot with a 'sort-of' long-term memory 🧠 with [Text generation web UI](htt
   * `terminal`: 💻 terminal based chats
   * `sttts`: 🗣️ Speech-To-Text & Text-To-Speech
 - Rolling message history
-- Long-term memory using RediSearch with embeddings
+- Long-term memory using embeddings with Redi🔍 backend
 - Message correction that feeds corrections back into message history (e.g. can correct some command syntax issues)
 - Bot can call Tools (including web-browsing and code execution)
 
@@ -24,7 +24,10 @@ Chatbot with a 'sort-of' long-term memory 🧠 with [Text generation web UI](htt
 
 - **Redis with Redi🔍**: `docker run -p 6379:6379 redis/redis-stack`.
 - 📄 Refer to [Dockerfile](Dockerfile) for OS dependencies.
-- **[Text generation web UI](https://github.com/oobabooga/text-generation-webui)** (with API enabled) or an OpenAI API key.
+- One of the following backends:
+  * **[llama-node](https://github.com/Atome-FE/llama-node) compatible models**
+  * **[Text generation web UI](https://github.com/oobabooga/text-generation-webui)** *(with API enabled)*
+  * **[OpenAI](https://platform.openai.com/) API key**
 
 ### Optional
 
@@ -34,10 +37,11 @@ Chatbot with a 'sort-of' long-term memory 🧠 with [Text generation web UI](htt
 
 ## 🛠️ Configuration
 
-- **[Text generation web UI Example](data/settings.example.webui.json)**
-- **[OpenAI Example](data/settings.example.openai.json)**
+- **[llama-node Example](data/persistent/settings.example.llama.json)**
+- **[Text generation web UI Example](data/persistent/settings.example.webui.json)**
+- **[OpenAI Example](data/persistent/settings.example.openai.json)**
 
-Copy an example configuration from `data/settings.example.*.json` to `data/settings.json`.
+Copy an example configuration from `data/persistent/settings.example.*.json` to `data/persistent/settings.json`.
 
 ## 🚀 Build and run docker image
 
@@ -45,16 +49,17 @@ Copy an example configuration from `data/settings.example.*.json` to `data/setti
 docker build -t deads-inc/open-chatbot-js .
 ```
 
-`<mode>` is one of the implemented clients, e.g. `terminal`.
+*`<mode>` is one of the implemented clients, e.g. `terminal`*
 
 ```
-docker run -it --rm --net=host -v ./data/settings.json:/app/data/settings.json deads-inc/open-chatbot-js <mode> -s data/settings.json
+docker run -it --rm --net=host -v ./data/persistent/:/app/data/persistent/ deads-inc/open-chatbot-js <mode> -s data/persistent/settings.json
 ```
+
+*ensure to load the correct settings file*
 
 ## 🏗️ Build locally
 
 ```
-pip install -r utils/requirements.txt
 cd ./open-chatbot-js
 npm install --omit=dev
 npx tsc --project tsconfig.prod.json

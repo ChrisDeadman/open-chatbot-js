@@ -66,6 +66,6 @@ RUN npx tsc --project tsconfig.prod.json
 # Copy Startup script
 COPY startup.sh ./
 
-VOLUME [ "/app/data/settings.json" ]
+VOLUME [ "/app/data/persistent/" ]
 
 ENTRYPOINT [ "sh" , "/app/startup.sh" ]

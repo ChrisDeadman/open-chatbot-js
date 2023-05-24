@@ -1,46 +1,57 @@
 import { exec } from 'child_process';
-import { settings } from '../settings.js';
-import { countStringTokens } from '../utils/token_utils.js';
-import { ConvMessage } from './conv_message.js';
 import { EmbeddingModel } from './embedding_model.js';
+import { TokenModel } from './token_model.js';
+import { ConvMessage, buildPrompt } from '../utils/conv_message.js';
+import { TiktokenModel, encoding_for_model } from '@dqbd/tiktoken';
 
-export class SbertEmbedding implements EmbeddingModel {
-    embedding_dimension = 768;
-    private embedding_model: string;
+export class SbertEmbedding extends TokenModel implements EmbeddingModel {
+    dimension = 768;
+    maxTokens: number;
+    private model: string;
 
-    constructor(embedding_model: string) {
-        this.embedding_model = embedding_model;
+    constructor(model: string, maxTokens: number) {
+        super();
+        this.model = model;
+        this.maxTokens = maxTokens;
+    }
+
+    async tokenize(messages: ConvMessage[]): Promise<number[]> {
+        if (messages.length <= 0) {
+            return [];
+        }
+
+        const content = await buildPrompt(messages);
+
+        // TODO proper tokenizing
+        const enc = encoding_for_model('text-embedding-ada-002' as TiktokenModel);
+        try {
+            return [...enc.encode(content)];
+        } finally {
+            enc.free();
+        }
     }
 
     async createEmbedding(messages: ConvMessage[]): Promise<number[]> {
-        let memContext: string[] = [];
-        for (let i = -9; i <= 0; i += 1) {
-            memContext = messages
-                .filter(msg => msg.role != 'system')
-                .slice(i)
-                .map(this.convMessageToString.bind(this));
-            const numTokens = countStringTokens(memContext, 'text-embedding-ada-002'); // TODO use closer model
-            if (numTokens <= settings.bot_model_token_limit) {
-                break;
-            }
+        if (messages.length <= 0) {
+            return [];
         }
 
-        if (memContext.length > 0) {
-            const output = await this.runPythonScript('utils/sbert-embeddings.py', [
-                '--model',
-                `"${this.embedding_model}"`,
-                `'${memContext.join(" ").replaceAll("'", '"')}'`,
-            ]);
-            const embeddings = JSON.parse(output);
-            return embeddings.flat();
-        }
-        return [];
-    }
+        console.debug(`SbertEmbedding: createEmbedding with ${messages.length} messages...`);
+        const startTime = Date.now();
 
-    private convMessageToString(message: ConvMessage): string {
-        return message.role === 'system'
-            ? message.content
-            : `${message.sender}: ${message.content}`;
+        const prompt = await buildPrompt(messages);
+        const output = await this.runPythonScript('utils/sbert-embedding.py', [
+            '--model',
+            `"${this.model}"`,
+            `'${prompt.replaceAll("'", '"')}'`,
+        ]);
+        const embeddings = JSON.parse(output);
+
+        const endTime = Date.now();
+        const elapsedMs = endTime - startTime;
+        console.debug(`SbertEmbedding: finished after ${elapsedMs}ms`);
+
+        return embeddings.flat();
     }
 
     private runPythonScript(scriptPath: string, args: string[]): Promise<string> {

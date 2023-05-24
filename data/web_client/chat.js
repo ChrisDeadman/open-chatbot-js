@@ -46,9 +46,15 @@ settingsForm.addEventListener("submit", function (e) {
 
 promptForm.addEventListener("submit", function (e) {
   e.preventDefault();
-  initialPrompt = document.getElementById("initialPrompt").value;
   socket.emit("update prompt", {
-    initialPrompt,
+    system_message: document.getElementById("systemMessage").value,
+    user_message: document.getElementById("userMessage").value,
+    assistant_message: document.getElementById("assistantMessage").value,
+    suffix: document.getElementById("suffix").value,
+    prefix: document.getElementById("prefix").value.split("\n"),
+    bot_browser_prompt: document
+      .getElementById("botBrowserPrompt")
+      .value.split("\n"),
   });
 });
 

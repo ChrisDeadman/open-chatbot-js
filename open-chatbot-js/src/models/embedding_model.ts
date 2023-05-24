@@ -1,6 +1,6 @@
-import { ConvMessage } from './conv_message.js';
+import { ConvMessage } from '../utils/conv_message.js';
 
 export interface EmbeddingModel {
-    embedding_dimension: number;
+    dimension: number;
     createEmbedding: (messages: ConvMessage[]) => Promise<number[]>;
 }

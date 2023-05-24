@@ -2,7 +2,10 @@ import { Browser, Page } from 'puppeteer';
 
 import { settings } from '../settings.js';
 
+import { PromptTemplate } from 'langchain/prompts';
 import { BotModel } from '../models/bot_model.js';
+import { ConvMessage } from '../utils/conv_message.js';
+import { dateTimeToStr } from '../utils/conversion_utils.js';
 
 class PageData {
     url: string;
@@ -54,13 +57,20 @@ export class BotBrowser {
     }
 
     private async readPage(pageData: PageData, question: string, language: string) {
-        const chunkSize = settings.bot_model_token_limit - settings.bot_browser_prompt.length - 512;
+        // Prepare bot model prompt template
+        const promptTemplate = new PromptTemplate({
+            inputVariables: [...Object.keys(settings), 'question', 'summary', 'content', 'now'],
+            template: settings.prompt_templates.bot_browser_prompt.join('\n'),
+        });
+
+        // Calculate size of page chunks
+        const chunkSize = settings.bot_model_token_limit - promptTemplate.template.length - 512;
+
+        // Always use HTTP for proxys, HTTPS for everything else
         const proto_url = pageData.url
             .replace('http://', '')
             .replace('https://', '')
             .replace('file:///', '');
-
-        // Always use HTTP for proxys
         const url = settings.proxy_host != null ? `http://${proto_url}` : `https://${proto_url}`;
 
         try {
@@ -132,36 +142,26 @@ export class BotBrowser {
             while (pageData.content.length > 0) {
                 // Wait a bit so messages can be sent in between the requests
                 await new Promise(resolve => setTimeout(resolve, 1000));
-                const messages = [
-                    {
-                        role: 'system',
-                        sender: 'system',
-                        content: settings.bot_browser_prompt
-                            .join('\n')
-                            .replaceAll('$BOT_NAME', this.botModel.name)
-                            .replaceAll('$QUESTION', question)
-                            .replaceAll('$LANGUAGE', language),
-                    },
-                    {
-                        role: 'assistant',
-                        sender: this.botModel.name,
-                        content: `Summary:\n${pageData.summary}`,
-                    },
-                    {
-                        role: 'system',
-                        sender: 'system',
-                        content: `Content:\n${pageData.content.shift()}`,
-                    },
-                ];
-                pageData.summary = (await this.botModel.chat(messages))
-                    .replaceAll('Summary:', '')
-                    .replaceAll('Content:', '')
-                    .trim();
+
+                // format bot model prompt
+                const prompt = await promptTemplate.format({
+                    ...settings,
+                    question: question,
+                    summary: pageData.summary,
+                    content: pageData.content.shift(),
+                    language: language,
+                    now: dateTimeToStr(new Date(), settings.locale),
+                });
+
+                // generate updated summary
+                pageData.summary = await this.botModel.chat([
+                    new ConvMessage('system', 'system', prompt),
+                ]);
             }
 
             // Update status
             pageData.done = true;
-            pageData.reload = pageData.summary.trim().length <= 0;
+            pageData.reload = pageData.summary.length <= 0;
         } catch (error) {
             pageData.summary = String(error);
             pageData.reload = true;

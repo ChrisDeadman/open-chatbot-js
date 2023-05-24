@@ -5,8 +5,9 @@ import { Server } from 'socket.io';
 import { CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
-import { ConvMessage } from '../models/conv_message.js';
+import { TokenModel } from '../models/token_model.js';
 import { settings } from '../settings.js';
+import { ConvMessage } from '../utils/conv_message.js';
 import { CyclicBuffer } from '../utils/cyclic_buffer.js';
 import { BotClient } from './bot_client.js';
 
@@ -21,13 +22,14 @@ export class WebClient extends BotClient {
 
     constructor(
         botModel: BotModel,
+        tokenModel: TokenModel,
         memory: MemoryProvider,
         botApiHandler: CommandApi,
         username = 'User'
     ) {
-        super(botModel, memory, botApiHandler);
+        super(botModel, tokenModel, memory, botApiHandler);
         this.username = username;
-        this.language = settings.default_language;
+        this.language = settings.language;
         this.conversation = new CyclicBuffer(settings.message_history_size);
 
         this.app = express();
@@ -48,8 +50,7 @@ export class WebClient extends BotClient {
                 username: this.username,
                 botname: this.botModel.name,
                 language: this.language,
-                initialPrompt: this.initialPrompt,
-                botBrowserPrompt: settings.bot_browser_prompt.join('\n'),
+                prompt_templates: settings.prompt_templates,
             });
         });
 
@@ -57,14 +58,10 @@ export class WebClient extends BotClient {
             socket.on('chat message', async msg => {
                 this.chatting = true;
                 try {
-                    msg = msg.trim();
+                    msg = msg.trimStart();
                     if (msg.length > 0) {
                         // Add new message to conversation
-                        this.conversation.push({
-                            role: 'user',
-                            sender: this.username,
-                            content: `${msg}`,
-                        });
+                        this.conversation.push(new ConvMessage('user', this.username, `${msg}`));
 
                         // Chat with bot
                         await this.chat(this.conversation, this.language);
@@ -80,13 +77,15 @@ export class WebClient extends BotClient {
                 this.botModel.name = settings.botname;
                 this.language = settings.language;
             });
-            socket.on('update prompt', async settings => {
-                this.initialPrompt = settings.initialPrompt;
+            socket.on('update prompt', async prompt_templates => {
+                settings.prompt_templates = prompt_templates;
             });
         });
 
         this.server.listen(settings.web_server_port, settings.web_server_host, () => {
-            console.log(`web-client listening on http://${settings.web_server_host}:${settings.web_server_port}`);
+            console.log(
+                `web-client listening on http://${settings.web_server_host}:${settings.web_server_port}`
+            );
         });
 
         console.log('Bot startup complete.');

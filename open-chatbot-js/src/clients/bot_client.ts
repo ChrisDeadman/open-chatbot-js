@@ -1,23 +1,30 @@
+import { PromptTemplate } from 'langchain/prompts';
 import { Command, CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
-import { ConvMessage } from '../models/conv_message.js';
+import { TokenModel } from '../models/token_model.js';
 import { settings } from '../settings.js';
+import { ConvMessage } from '../utils/conv_message.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { CyclicBuffer } from '../utils/cyclic_buffer.js';
-import { fixAndParseJson } from '../utils/json_utils.js';
+import { commandToString, parseCommandBlock, parseJsonCommands } from '../utils/parsing_utils.js';
 
 export abstract class BotClient {
     public botModel: BotModel;
+    public tokenModel: TokenModel;
     public memory: MemoryProvider;
     protected botApiHandler: CommandApi;
-    protected initialPrompt: string;
 
-    constructor(botModel: BotModel, memory: MemoryProvider, botApiHandler: CommandApi) {
+    constructor(
+        botModel: BotModel,
+        tokenModel: TokenModel,
+        memory: MemoryProvider,
+        botApiHandler: CommandApi
+    ) {
         this.botModel = botModel;
+        this.tokenModel = tokenModel;
         this.memory = memory;
         this.botApiHandler = botApiHandler;
-        this.initialPrompt = settings.initial_prompt.join('\n');
     }
 
     abstract startup(): Promise<void>;
@@ -42,7 +49,9 @@ export abstract class BotClient {
         this.startTyping(context);
         try {
             // get memory vector related to conversation context
-            const memContext = conv_list.filter(msg => msg.role != 'system');
+            const memContext = await this.tokenModel.truncateMessages(
+                conv_list.filter(msg => msg.role != 'system')
+            );
 
             // chat with bot
             const messages = await this.getMessages(conv_list, memContext, language);
@@ -53,28 +62,28 @@ export abstract class BotClient {
 
             // store the bot response
             if (responseData.message.length > 0) {
-                conversation.push({
-                    role: 'assistant',
-                    sender: this.botModel.name,
-                    content: responseData.message,
-                });
+                conversation.push(
+                    new ConvMessage('assistant', this.botModel.name, responseData.message)
+                );
             }
 
             // Execute commands
             if (allowCommands && responseData.commands.length > 0) {
                 responseData.commands.forEach((cmd: Record<string, string>) => {
-                    // Clear message upon NOP command
-                    if (cmd.command === Command.Nop) {
-                        responseData.message = '';
+                    // Replace message with thought
+                    if (responseData.commands.length < 2 && cmd.command === Command.Thought) {
+                        responseData.message = 'data' in cmd ? `*${cmd.data.trim()}*` : '';
                     }
                     this.botApiHandler.handleRequest(cmd, memContext, language).then(result => {
                         // Add API response to system messages when finished
                         if (result.length > 0) {
-                            conversation.push({
-                                role: 'system',
-                                sender: 'system',
-                                content: result,
-                            });
+                            conversation.push(
+                                new ConvMessage(
+                                    'system',
+                                    'system',
+                                    result.slice(0, this.tokenModel.maxTokens / 2) // limit text
+                                )
+                            );
                             this.handleResponse(context, result);
                         }
                     });
@@ -101,51 +110,43 @@ export abstract class BotClient {
     ): Promise<ConvMessage[]> {
         const messages: ConvMessage[] = [];
 
-        const initialPrompt = this.initialPrompt
-            .replaceAll('$BOT_NAME', this.botModel.name)
-            .replaceAll('$NOW', dateTimeToStr(new Date(), settings.locale))
-            .replaceAll('$LANGUAGE', language);
+        // format prefix
+        const prefixTemplate = new PromptTemplate({
+            inputVariables: [...Object.keys(settings), 'now'],
+            template: settings.prompt_templates.prefix.join('\n'),
+        });
+        const prefix = await prefixTemplate.format({
+            ...settings,
+            language: language,
+            now: dateTimeToStr(new Date(), settings.locale),
+        });
 
-        // add initial prompt to the context
-        if (initialPrompt.length >= 0) {
-            messages.push({
-                role: 'system',
-                sender: 'system',
-                content: initialPrompt,
-            });
+        // add prefix to the context
+        if (prefix.length >= 0) {
+            messages.push(new ConvMessage('system', 'system', prefix));
         }
 
         if (memoryContext.length > 0) {
             // get memories related to the memory vector
-            const memories = (await this.memory.get(memoryContext, 10)).map(m => ({
-                role: 'system',
-                sender: 'system',
-                content: m,
-            }));
+            const memories = (await this.memory.get(memoryContext, 10)).map(
+                m => new ConvMessage('system', 'system', m)
+            );
 
             // add limited amount of memories
-            while (memories.length > 0) {
-                // add memory tokens to messages if they fit
-                if (this.botModel.fits(messages.concat(memories), 1500)) {
-                    memories.forEach(m => messages.push(m));
-                    break;
-                }
-                // if not, remove another memory and try again
-                memories.pop();
-            }
+            const memoriesLimited = await this.tokenModel.truncateMessages(
+                memories,
+                this.tokenModel.maxTokens / 2
+            );
+            memoriesLimited.forEach(m => messages.push(m));
         }
 
-        // add most recent messages
-        const convContext = [...conversation];
-        while (convContext.length > 0) {
-            // as long as there are enough tokens remaining for the response
-            if (this.botModel.fits(messages.concat(convContext), -512)) {
-                convContext.forEach(m => messages.push(m));
-                break;
-            }
-            // if not, remove the oldest message
-            convContext.shift();
-        }
+        // add most recent messages, save some tokens for the response
+        const currentTokens = await this.tokenModel.tokenize(messages);
+        const messagesLimited = await this.tokenModel.truncateMessages(
+            conversation,
+            -(currentTokens.length + 512)
+        );
+        messagesLimited.forEach(m => messages.push(m));
 
         return messages;
     }
@@ -158,62 +159,39 @@ export abstract class BotClient {
         }
 
         // Strip excess newlines
-        response = response.replaceAll('\r', '').replaceAll(/(\s*\n){2,}/g, '\n');
+        response = response.replaceAll('\r', '\n').replaceAll(/(\s*\n){2,}/g, '\n');
 
-        let commands: any[] = [];
+        const commands: Record<string, string>[] = [];
 
         // Check each code segment for commands
         for (const match of [...response.matchAll(/[`]+([^`]+)[`]+/g)]) {
-            const new_cmds = this.parseCommand(match[1]);
+            const new_cmds: Record<string, string>[] = [];
+            const command = parseCommandBlock(match[1]);
+            if (command) {
+                new_cmds.push(command);
+            } else {
+                new_cmds.push(...parseJsonCommands(match[1]));
+            }
             if (new_cmds.length > 0) {
                 // Add to the parsed command list
-                commands = commands.concat(new_cmds);
-                if (new_cmds.length > 1 || new_cmds[0].command != Command.Python) {
-                    // Replace commands with parsed commands in the response
+                commands.push(...new_cmds);
+                // Replace commands with parsed commands in the response
+                // This aids the model in keeping consistent formatting
+                const useJson = false;
+                if (useJson) {
                     response = response.replace(
                         match[0],
-                        new_cmds.map((cmd: any) => `\`${JSON.stringify(cmd)}\``).join('\n')
+                        new_cmds.map(cmd => `\`${JSON.stringify(cmd)}\``).join('\n')
+                    );
+                } else {
+                    response = response.replace(
+                        match[0],
+                        new_cmds.map(cmd => commandToString(cmd)).join('\n')
                     );
                 }
             }
         }
 
-        return { message: response, commands: commands };
-    }
-
-    private parseCommand(response: string): Record<string, string>[] {
-        const commands: Record<string, string>[] = [];
-
-        // Match code-block types with commands
-        const cmd = response
-            .trimStart()
-            .match(new RegExp(`^(${Object.values(Command).join('|')})\\s*([\\s\\S]+)`, 'i'));
-        if (cmd) {
-            return [{ command: cmd[1], data: cmd[2] }];
-        }
-
-        try {
-            // Fix and parse json
-            let responseData = fixAndParseJson(response);
-
-            // Not a command response
-            if (typeof responseData === 'string') {
-                return commands;
-            }
-
-            // Combine multiple responses
-            if (!Array.isArray(responseData)) {
-                responseData = [responseData];
-            }
-            responseData.forEach((r: Record<string, string>) => {
-                if ('command' in r) {
-                    commands.push(r);
-                }
-            });
-        } catch (error) {
-            // ignore
-        }
-
-        return commands;
+        return { message: response, commands: [...new Set(commands)] };
     }
 }
