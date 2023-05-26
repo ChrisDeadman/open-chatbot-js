@@ -17,10 +17,6 @@ export class ConvMessage {
 export async function buildPrompt(messages: ConvMessage[]): Promise<string> {
     const prompt: string[] = [];
 
-    const prefixTemplate = new PromptTemplate({
-        inputVariables: ['content'],
-        template: '{content}',
-    });
     const systemTemplate = new PromptTemplate({
         inputVariables: ['role', 'sender', 'content'],
         template: settings.prompt_templates.system_message,
@@ -39,7 +35,7 @@ export async function buildPrompt(messages: ConvMessage[]): Promise<string> {
     });
 
     // Initial prompt is already provided
-    prompt.push(await prefixTemplate.format(messages[0]));
+    prompt.push(messages[0].content);
 
     // Messages
     for (const m of messages.slice(1)) {

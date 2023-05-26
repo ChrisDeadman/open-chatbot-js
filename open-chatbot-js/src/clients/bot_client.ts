@@ -70,9 +70,10 @@ export abstract class BotClient {
             // Execute commands
             if (allowCommands && responseData.commands.length > 0) {
                 responseData.commands.forEach((cmd: Record<string, string>) => {
+                    console.debug(`CMD: ${JSON.stringify(cmd)}`);
                     // Replace message with thought
                     if (responseData.commands.length < 2 && cmd.command === Command.Thought) {
-                        responseData.message = 'data' in cmd ? `*${cmd.data.trim()}*` : '';
+                        responseData.message = `*${cmd.data.trim()}*`;
                     }
                     this.botApiHandler.handleRequest(cmd, memContext, language).then(result => {
                         // Add API response to system messages when finished

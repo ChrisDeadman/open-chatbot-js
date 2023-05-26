@@ -15,12 +15,8 @@ export function parseCommandBlock(response: string): Record<string, string> | nu
     );
 
     for (const argMatch of argMatches) {
-        if (argMatch[1] === undefined) {
-            const data = cmdMatch[2].slice(argMatch.index != null ? argMatch.index : 0);
-            if (data.trim().length <= 0) {
-                return null;
-            }
-            result['data'] = data;
+        if (argMatch[1] === undefined || argMatch[1].startsWith('http')) {
+            result['data'] = cmdMatch[2].slice(argMatch.index != null ? argMatch.index : 0);
             break;
         } else {
             result[argMatch[1].slice(0, argMatch[1].length - 1)] = argMatch[2];

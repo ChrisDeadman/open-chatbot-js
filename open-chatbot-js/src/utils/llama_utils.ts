@@ -42,7 +42,6 @@ export function filterResponse(response: string, stoppingStrings: string[]): str
         .replaceAll('\\_', '_')
         .replaceAll('​', '')
         .replaceAll(/(?<=\p{Extended_Pictographic})\p{Extended_Pictographic}{3,}/gu, '') // Prevent emoji flood
-        .replace(/^\s*(?!\d)\p{Extended_Pictographic}/u, '') // prevent emoji at beginning of every sentence
         .replace(removeAfterStop, '')
         .replace(removeTrailingStop, '')
         .trim();

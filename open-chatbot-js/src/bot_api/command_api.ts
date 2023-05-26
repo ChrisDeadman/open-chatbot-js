@@ -38,36 +38,37 @@ export class CommandApi {
         try {
             switch (commandArgs.command) {
                 case Command.StoreMemory: {
-                    if (
-                        'data' in commandArgs &&
-                        commandArgs.data.length > 0 &&
-                        memContext.length > 0
-                    ) {
+                    if (commandArgs.data.length > 0 && memContext.length > 0) {
                         await this.memory.add(memContext, commandArgs.data);
                     }
                     break;
                 }
                 case Command.DeleteMemory: {
-                    if (
-                        'data' in commandArgs &&
-                        commandArgs.data.length > 0 &&
-                        memContext.length > 0
-                    ) {
+                    if (commandArgs.data.length > 0 && memContext.length > 0) {
                         await this.memory.del(memContext, commandArgs.data);
                     }
                     break;
                 }
                 case Command.BrowseWebsite: {
                     if (this.botBrowser) {
-                        const question =
-                            typeof commandArgs.question === 'string' &&
-                            commandArgs.question.trim() !== ''
-                                ? commandArgs.question
-                                : 'what is on the website?';
-                        if (!('url' in commandArgs))
-                            [(commandArgs.url = String(commandArgs.data).split('\n')[0])];
+                        let url = commandArgs.url;
+                        let question = commandArgs.question;
+                        const data = String(commandArgs.data);
+
+                        if (url === undefined) {
+                            url = data.split('\n')[0].trim();
+                        }
+
+                        if (question === undefined) {
+                            question = data.split('\n').slice(1).join('\n').trim();
+                        }
+
+                        if (question.length <= 0) {
+                            question = 'what is on the website?';
+                        }
+
                         const pageData = await this.botBrowser.getPageData(
-                            commandArgs.url,
+                            url,
                             question,
                             language
                         );
@@ -78,7 +79,7 @@ export class CommandApi {
                     break;
                 }
                 case Command.Python: {
-                    if ('data' in commandArgs && commandArgs.data.length > 0) {
+                    if (commandArgs.data.length > 0) {
                         const url = `http://${settings.python_executor_host}:${settings.python_executor_port}/execute`;
                         const config = {
                             headers: {

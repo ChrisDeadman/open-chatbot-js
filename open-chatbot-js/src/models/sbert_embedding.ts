@@ -43,7 +43,7 @@ export class SbertEmbedding extends TokenModel implements EmbeddingModel {
         const output = await this.runPythonScript('utils/sbert-embedding.py', [
             '--model',
             `"${this.model}"`,
-            `'${prompt.replaceAll("'", '"')}'`,
+            `'${prompt.replace(/'/g, `'"'"'`)}'`,
         ]);
         const embeddings = JSON.parse(output);
 
