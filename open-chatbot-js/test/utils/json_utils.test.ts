@@ -37,10 +37,10 @@ describe('TestJsonUtils', () => {
     });
 
     test('test_invalid_single_quotes', () => {
-        const jsonStr = "{'name': 'Hons', 'command': {'name': 'thought', 'args': {}}}";
+        const jsonStr = "{'name': 'Hons', 'command': {'name': 'exit', 'args': {}}}";
         expect(fixAndParseJson(jsonStr)).toEqual({
             name: 'Hons',
-            command: { name: 'thought', args: {} },
+            command: { name: 'exit', args: {} },
         });
     });
 

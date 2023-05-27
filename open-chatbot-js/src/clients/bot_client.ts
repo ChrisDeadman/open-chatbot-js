@@ -71,9 +71,13 @@ export abstract class BotClient {
             if (allowCommands && responseData.commands.length > 0) {
                 responseData.commands.forEach((cmd: Record<string, string>) => {
                     console.debug(`CMD: ${JSON.stringify(cmd)}`);
-                    // Replace message with thought
-                    if (responseData.commands.length < 2 && cmd.command === Command.Thought) {
-                        responseData.message = `*${cmd.data.trim()}*`;
+                    switch (cmd.command) {
+                        case Command.Exit:
+                            // Exit: Respond with empty message
+                            responseData.message = '';
+                            break;
+                        default:
+                            break;
                     }
                     this.botApiHandler.handleRequest(cmd, memContext, language).then(result => {
                         // Add API response to system messages when finished
@@ -111,26 +115,50 @@ export abstract class BotClient {
     ): Promise<ConvMessage[]> {
         const messages: ConvMessage[] = [];
 
-        // format prefix
-        const prefixTemplate = new PromptTemplate({
+        // parse tools
+        const toolsTemplate = new PromptTemplate({
             inputVariables: [...Object.keys(settings), 'now'],
-            template: settings.prompt_templates.prefix.join('\n'),
+            template: settings.prompt_templates.tools.join('\n'),
         });
-        const prefix = await prefixTemplate.format({
+        const tools = await toolsTemplate.format({
             ...settings,
             language: language,
             now: dateTimeToStr(new Date(), settings.locale),
         });
 
-        // add prefix to the context
-        if (prefix.length >= 0) {
-            messages.push(new ConvMessage('system', 'system', prefix));
+        // parse prefix
+        const prefixTemplate = new PromptTemplate({
+            inputVariables: [...Object.keys(settings), 'tools', 'now'],
+            template: settings.prompt_templates.prefix.join('\n'),
+        });
+        const prefix = await prefixTemplate.format({
+            ...settings,
+            language: language,
+            tools: tools,
+            now: dateTimeToStr(new Date(), settings.locale),
+        });
+
+        // parse history
+        const historyTemplate = new PromptTemplate({
+            inputVariables: [...Object.keys(settings), 'now'],
+            template: settings.prompt_templates.history.join('\n'),
+        });
+        const history = await historyTemplate.format({
+            ...settings,
+            language: language,
+            now: dateTimeToStr(new Date(), settings.locale),
+        });
+
+        // combine and add them to the memories
+        const combined = `${prefix}\n${history}`;
+        if (combined.length >= 0) {
+            messages.push(new ConvMessage('system', 'system', combined));
         }
 
         if (memoryContext.length > 0) {
             // get memories related to the memory vector
             const memories = (await this.memory.get(memoryContext, 10)).map(
-                m => new ConvMessage('system', 'system', m)
+                m => new ConvMessage('system', 'memory', m)
             );
 
             // add limited amount of memories
@@ -168,7 +196,7 @@ export abstract class BotClient {
         const commands: Record<string, string>[] = [];
 
         // Check each code segment for commands
-        for (const match of [...response.matchAll(/[`]+([^`]+)[`]+/g)]) {
+        for (const match of [...response.matchAll(/[`]+([^`]+)[`]*/g)]) {
             const new_cmds: Record<string, string>[] = [];
             const command = parseCommandBlock(match[1]);
             if (command) {

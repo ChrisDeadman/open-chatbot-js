@@ -68,8 +68,16 @@
                     <textarea id="prefix" class="form-control py-2" rows="15"><%= prompt_templates.prefix.join('\n') %></textarea>
                   </div>
                   <div class="form-group">
+                    <label for="history" class="py-2">History:</label>
+                    <textarea id="history" class="form-control py-2" rows="15"><%= prompt_templates.history.join('\n') %></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label for="tools" class="py-2">Tools:</label>
+                    <textarea id="tools" class="form-control py-2" rows="15"><%= prompt_templates.tools.join('\n') %></textarea>
+                  </div>
+                  <div class="form-group">
                     <label for="botBrowserPrompt" class="py-2">Bot-Browser Prompt:</label>
-                    <textarea id="botBrowserPrompt" class="form-control py-2" rows="10"><%= prompt_templates.bot_browser_prompt.join('\n') %></textarea>
+                    <textarea id="botBrowserPrompt" class="form-control py-2" rows="10"><%= prompt_templates.bot_browser.join('\n') %></textarea>
                   </div>
                   <div class="modal-footer">
                     <button type="submit" class="btn btn-primary" data-bs-dismiss="modal">Save</button>

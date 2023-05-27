@@ -179,7 +179,7 @@ export class DiscordClient extends BotClient {
             // format status prompt
             const statusPromptTemplate = new PromptTemplate({
                 inputVariables: [...Object.keys(settings), 'now'],
-                template: settings.prompt_templates.status_prompt,
+                template: settings.prompt_templates.status,
             });
             const statusPrompt = await statusPromptTemplate.format({
                 ...settings,

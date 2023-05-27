@@ -60,7 +60,7 @@ export class BotBrowser {
         // Prepare bot model prompt template
         const promptTemplate = new PromptTemplate({
             inputVariables: [...Object.keys(settings), 'question', 'summary', 'content', 'now'],
-            template: settings.prompt_templates.bot_browser_prompt.join('\n'),
+            template: settings.prompt_templates.bot_browser.join('\n'),
         });
 
         // Calculate size of page chunks

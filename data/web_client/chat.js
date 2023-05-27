@@ -52,7 +52,9 @@ promptForm.addEventListener("submit", function (e) {
     assistant_message: document.getElementById("assistantMessage").value,
     suffix: document.getElementById("suffix").value,
     prefix: document.getElementById("prefix").value.split("\n"),
-    bot_browser_prompt: document
+    history: document.getElementById("history").value.split("\n"),
+    tools: document.getElementById("tools").value.split("\n"),
+    bot_browser: document
       .getElementById("botBrowserPrompt")
       .value.split("\n"),
   });
