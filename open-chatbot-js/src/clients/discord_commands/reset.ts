@@ -5,7 +5,7 @@ export const data = new SlashCommandBuilder().setName('reset').setDescription('R
 
 export async function execute(client: DiscordClient, interaction: any) {
     const conversation = client.getConversation(interaction.channelId);
-    conversation.messages.clear();
+    conversation.clear();
     const response = 'My conversation state is reset.';
     console.log(`[${interaction.channelId}] ${response}`);
     await interaction.reply(response);

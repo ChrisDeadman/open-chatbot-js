@@ -1,32 +1,31 @@
 import axios from 'axios';
-import { settings } from '../settings.js';
-import { ConvMessage, buildPrompt } from '../utils/conv_message.js';
+import { Conversation } from '../utils/conversation.js';
 import { buildStoppingStrings, filterResponse } from '../utils/llama_utils.js';
 import { BotModel } from './bot_model.js';
 
 export class WebUIBot implements BotModel {
-    name: string;
     maxTokens: number;
     private endpoint: string;
 
-    constructor(name: string, endpoint: string, maxTokens: number) {
-        this.name = name;
+    constructor(endpoint: string, maxTokens: number) {
         this.maxTokens = maxTokens;
         this.endpoint = endpoint;
     }
 
-    async chat(messages: ConvMessage[]): Promise<string> {
-        const prompt = await buildPrompt(messages);
-        const stoppingStrings = buildStoppingStrings(messages);
-
+    async chat(conversation: Conversation): Promise<string> {
+        const messages = await conversation.getPrompt();
         console.debug(`WebUI: chat with ${messages.length} messages...`);
         const startTime = Date.now();
         try {
+            const stoppingStrings = buildStoppingStrings(messages);
+            const prompt = await conversation.getPromptString(messages);
+
             const completion = await axios.post(
                 `${this.endpoint}/generate`,
                 {
                     prompt,
                     stopping_strings: stoppingStrings,
+                    seed: Math.round(Math.random() * 1e9),
                     use_authors_note: false,
                     use_memory: false,
                     use_story: false,
@@ -44,10 +43,12 @@ export class WebUIBot implements BotModel {
                     truncation_length: this.maxTokens,
                 },
                 {
-                    timeout: settings.browser_timeout,
+                    timeout: conversation.settings.browser_timeout,
                 }
             );
             const response = String(completion.data.results[0].text);
+
+            // console.debug(`WebUI DEBUG:\n${prompt}${response}`);
 
             const endTime = Date.now();
             const elapsedMs = endTime - startTime;

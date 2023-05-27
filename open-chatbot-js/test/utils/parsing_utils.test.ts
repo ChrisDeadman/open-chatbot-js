@@ -129,7 +129,7 @@ describe('TestParsingUtils', () => {
 
     test('can convert unnamed command to string', () => {
         const command = { data: 'just some text' };
-        expect(commandToString(command)).toEqual('```\njust some text\n```\n');
+        expect(commandToString(command)).toEqual('```\njust some text\n```');
     });
 
     test('can convert python command to string', () => {
@@ -138,7 +138,7 @@ describe('TestParsingUtils', () => {
             data: ['import os', 'os.print("Hello, World!)'].join('\n'),
         };
         expect(commandToString(command)).toEqual(
-            '```python\nimport os\nos.print("Hello, World!)\n```\n'
+            '```python\nimport os\nos.print("Hello, World!)\n```'
         );
     });
 
@@ -149,7 +149,7 @@ describe('TestParsingUtils', () => {
             arg2: 'This is another\n multiline arg',
         };
         expect(commandToString(command)).toEqual(
-            '```deleteMemory\narg1: This is a multinie\narg.\narg2: This is another\n multiline arg\n```\n'
+            '```deleteMemory\narg1: This is a multinie\narg.\narg2: This is another\n multiline arg\n```'
         );
     });
 });

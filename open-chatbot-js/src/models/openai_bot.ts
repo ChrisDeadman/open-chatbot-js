@@ -3,7 +3,8 @@ import axios from 'axios';
 import { Job, Queue, QueueEvents, Worker } from 'bullmq';
 import { ChatCompletionRequestMessageRoleEnum, Configuration, OpenAIApi } from 'openai';
 import { settings } from '../settings.js';
-import { ConvMessage, buildPrompt } from '../utils/conv_message.js';
+import { ConvMessage } from '../utils/conv_message.js';
+import { Conversation } from '../utils/conversation.js';
 import { BotModel } from './bot_model.js';
 import { EmbeddingModel } from './embedding_model.js';
 import { TokenModel } from './token_model.js';
@@ -15,8 +16,7 @@ enum JobType {
 
 type JobData = { messages: ConvMessage[] };
 
-export class OpenAIBot extends TokenModel implements BotModel, EmbeddingModel {
-    name: string;
+export class OpenAIBot implements BotModel, TokenModel, EmbeddingModel {
     dimension = 1536;
     maxTokens: number;
     private openai: OpenAIApi;
@@ -25,15 +25,12 @@ export class OpenAIBot extends TokenModel implements BotModel, EmbeddingModel {
     private chatQueueEvents: QueueEvents;
     private worker: Worker;
 
-    constructor(name: string, openai_api_key: string, model: string, maxTokens: number) {
-        super();
-
-        this.name = name;
+    constructor(queueName: string, openai_api_key: string, model: string, maxTokens: number) {
         this.maxTokens = maxTokens;
         this.openai = new OpenAIApi(new Configuration({ apiKey: openai_api_key }));
         this.model = model;
 
-        this.chatQueue = new Queue<JobData, any>(`queue:${name}:jobs`, {
+        this.chatQueue = new Queue<JobData, any>(`queue:${queueName}:jobs`, {
             connection: {
                 host: settings.redis_host,
                 port: settings.redis_port,
@@ -58,9 +55,10 @@ export class OpenAIBot extends TokenModel implements BotModel, EmbeddingModel {
         });
     }
 
-    async chat(messages: ConvMessage[]): Promise<string> {
+    async chat(conversation: Conversation): Promise<string> {
+        const messages = await conversation.getPrompt();
         const job = await this.chatQueue.add(JobType.chat.toString(), {
-            messages: messages,
+            messages,
         });
         const result = await job.waitUntilFinished(this.chatQueueEvents);
         if (result != null) {
@@ -69,12 +67,12 @@ export class OpenAIBot extends TokenModel implements BotModel, EmbeddingModel {
         return '';
     }
 
-    async createEmbedding(messages: ConvMessage[]): Promise<number[]> {
-        if (messages.length <= 0) {
+    async createEmbedding(content: string): Promise<number[]> {
+        if (content.length <= 0) {
             return [];
         }
         const job = await this.chatQueue.add(JobType.createEmbedding.toString(), {
-            messages,
+            messages: [new ConvMessage('system', 'system', content)],
         });
         const result = await job.waitUntilFinished(this.chatQueueEvents);
         if (result === null) {
@@ -83,8 +81,7 @@ export class OpenAIBot extends TokenModel implements BotModel, EmbeddingModel {
         return result;
     }
 
-    async tokenize(messages: ConvMessage[]): Promise<number[]> {
-        const content = await buildPrompt(messages);
+    async tokenize(content: string): Promise<number[]> {
         const enc = encoding_for_model(this.model as TiktokenModel);
         try {
             return [...enc.encode(content)];
@@ -122,7 +119,7 @@ export class OpenAIBot extends TokenModel implements BotModel, EmbeddingModel {
             if (axios.isAxiosError(error)) {
                 // Obey OpenAI rate limit or retry on timeout
                 const status = error.response?.status;
-                if (status === undefined || status == 429) {
+                if (status === undefined || status === 429) {
                     this.worker.rateLimit(settings.bot_model_rate_limit_ms);
                     throw Worker.RateLimitError();
                 }
@@ -146,9 +143,8 @@ export class OpenAIBot extends TokenModel implements BotModel, EmbeddingModel {
     }
 
     private async _createEmbedding(messages: ConvMessage[]): Promise<number[]> {
-        const input = await buildPrompt(messages);
         const result = await this.openai.createEmbedding({
-            input: input,
+            input: messages.map(m => m.content),
             model: settings.embedding_model,
         });
         return result.data.data[0].embedding;

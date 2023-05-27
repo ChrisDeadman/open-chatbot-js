@@ -1,9 +1,7 @@
 import mime from 'mime-types';
 import fetch from 'node-fetch';
 
-import { Client, Events, GatewayIntentBits, Partials, Snowflake } from 'discord.js';
-
-import { settings } from '../settings.js';
+import { Channel, Client, Events, GatewayIntentBits, Partials, Snowflake } from 'discord.js';
 
 import { Collection } from 'discord.js';
 import { promises as fs } from 'node:fs';
@@ -18,26 +16,29 @@ import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
 import { TokenModel } from '../models/token_model.js';
 import { ConvMessage } from '../utils/conv_message.js';
+import { Conversation, ConversationEvents } from '../utils/conversation.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
-import { CyclicBuffer } from '../utils/cyclic_buffer.js';
 import { BotClient } from './bot_client.js';
 
 export class DiscordClient extends BotClient {
+    memory: MemoryProvider | undefined;
+    private settings: any;
     private client: Client;
     private commands = new Collection<string, any>();
     private commandArray = new Array<any>();
-    private conversation: {
-        [key: Snowflake]: { messages: CyclicBuffer<ConvMessage>; language: string };
-    } = {};
+    private conversation: { [key: Snowflake]: Conversation } = {};
     private typingTimeout: NodeJS.Timeout | undefined;
 
     constructor(
+        settings: any,
         botModel: BotModel,
         tokenModel: TokenModel,
-        memory: MemoryProvider,
-        botApiHandler: CommandApi
+        botApiHandler: CommandApi,
+        memory: MemoryProvider | undefined = undefined
     ) {
-        super(botModel, tokenModel, memory, botApiHandler);
+        super(botModel, tokenModel, botApiHandler);
+        this.settings = settings;
+        this.memory = memory;
         this.client = new Client({
             intents: [
                 GatewayIntentBits.Guilds,
@@ -86,7 +87,7 @@ export class DiscordClient extends BotClient {
     private async refreshCommands() {
         const rest = new REST({
             version: '9',
-        }).setToken(settings.discord_bot_token);
+        }).setToken(this.settings.discord_bot_token);
 
         const application = this.client.application;
         if (!application) {
@@ -110,7 +111,7 @@ export class DiscordClient extends BotClient {
         this.initEventListeners();
 
         console.log('Logging in...');
-        await this.client.login(settings.discord_bot_token);
+        await this.client.login(this.settings.discord_bot_token);
 
         console.log('Bot startup complete.');
     }
@@ -125,43 +126,20 @@ export class DiscordClient extends BotClient {
         console.log('Bot has been shut down.');
     }
 
-    protected async handleResponse(channel: any, response: string, chunkSize = 1000) {
-        const numChunks = Math.ceil(response.length / chunkSize);
-
-        console.log(`[${channel.id}] ${this.botModel.name}: ${response}`);
-
-        for (let chunk = 0, idx = 0; chunk < numChunks; ++chunk, idx += chunkSize) {
-            await channel.send(response.slice(idx, idx + chunkSize));
+    getConversation(channel: Channel): Conversation {
+        if (!(channel.id in this.conversation)) {
+            this.conversation[channel.id] = new Conversation(
+                this.settings,
+                this.tokenModel,
+                this.memory,
+                channel
+            );
+            this.conversation[channel.id].on(
+                ConversationEvents.Updated,
+                this.onConversationUpdated.bind(this)
+            );
         }
-    }
-
-    protected startTyping(channel: any, timeoutMs = 5000): void {
-        if (!this.typingTimeout) {
-            // Send typing every few seconds as long as bot is working
-            channel.sendTyping();
-            this.typingTimeout = setTimeout(() => {
-                this.typingTimeout = undefined;
-                this.startTyping(channel);
-            }, timeoutMs);
-        }
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    protected stopTyping(_channel: any): void {
-        if (this.typingTimeout) {
-            clearTimeout(this.typingTimeout);
-            this.typingTimeout = undefined;
-        }
-    }
-
-    getConversation(channelId: Snowflake) {
-        if (!(channelId in this.conversation)) {
-            this.conversation[channelId] = {
-                messages: new CyclicBuffer<ConvMessage>(settings.message_history_size),
-                language: settings.language,
-            };
-        }
-        return this.conversation[channelId];
+        return this.conversation[channel.id];
     }
 
     private initEventListeners() {
@@ -178,19 +156,18 @@ export class DiscordClient extends BotClient {
 
             // format status prompt
             const statusPromptTemplate = new PromptTemplate({
-                inputVariables: [...Object.keys(settings), 'now'],
-                template: settings.prompt_templates.status,
+                inputVariables: [...Object.keys(this.settings), 'now'],
+                template: this.settings.prompt_templates.status,
             });
             const statusPrompt = await statusPromptTemplate.format({
-                ...settings,
-                language: settings.language,
-                now: dateTimeToStr(new Date(), settings.locale),
+                ...this.settings,
+                now: dateTimeToStr(new Date(), this.settings.locale),
             });
 
-            const convContext = [new ConvMessage('system', 'system', statusPrompt)];
-            const messages = await this.getMessages(convContext, [], settings.language);
-            const response = await this.botModel.chat(messages);
-            const responseData = this.parseResponse(response);
+            const conversation = new Conversation(this.settings, this.tokenModel);
+            conversation.push(new ConvMessage('system', 'system', statusPrompt));
+            const response = await this.botModel.chat(conversation);
+            const responseData = this.parseResponse(response, conversation.settings.bot_name);
             responseData.message = responseData.message.split('.')[0];
             console.log(`Status message: ${responseData.message}`);
 
@@ -217,17 +194,15 @@ export class DiscordClient extends BotClient {
             }*/
 
             // Do not respond to self
-            if (message.author.id == this.client.user?.id) {
+            if (message.author.id === this.client.user?.id) {
                 return;
             }
 
             // Get conversation for this channel
-            const conversation = this.getConversation(message.channel.id);
+            const conversation = this.getConversation(message.channel);
 
             // Add message to the channel
-            conversation.messages.push(
-                new ConvMessage('user', message.author.username, message.content)
-            );
+            conversation.push(new ConvMessage('user', message.author.username, message.content));
             console.log(`[${message.channelId}] ${message.author.username}: ${message.content}`);
 
             // Add attachment text to the channel messages
@@ -243,7 +218,7 @@ export class DiscordClient extends BotClient {
                             const response = await fetch(attachment.url);
                             const textContent = await response.text();
                             // Add the attachment text to the channel messages
-                            conversation.messages.push(
+                            conversation.push(
                                 new ConvMessage(
                                     'user',
                                     message.author.username,
@@ -259,9 +234,6 @@ export class DiscordClient extends BotClient {
                     }
                 }
             }
-
-            // Schedule channel processing
-            await this.scheduleProcessChannel(message.channel);
         });
         //
         // COMMAND
@@ -297,45 +269,69 @@ export class DiscordClient extends BotClient {
         //
         this.client.on(Events.TypingStart, async typing => {
             // Ignore self
-            if (typing.user.id == this.client.user?.id) {
+            if (typing.user.id === this.client.user?.id) {
                 return;
             }
 
-            // Reschedule response if someone is typing
-            const channel = typing.channel as any;
-            if (channel.processTimeout != null && channel.isProcessing == false) {
-                await this.scheduleProcessChannel(channel);
-            }
+            // TODO
+            // const channel = typing.channel as any;
         });
     }
 
-    private async scheduleProcessChannel(channel: any) {
-        // Drop request if we are already processing
-        if (channel.isProcessing == true) {
-            return;
-        }
-
-        // Clear processChannel schedule
-        if (channel.processTimeout != null) {
-            clearTimeout(channel.processTimeout);
-            channel.processTimeout = null;
-        }
-
-        // Schedule processChannel
-        const timingVariance = Math.floor(Math.random() * settings.chat_process_delay_ms);
-        channel.processTimeout = setTimeout(async () => {
-            if (channel.isProcessing == true) {
-                return;
+    private async onConversationUpdated(conversation: Conversation) {
+        const channel = conversation.context;
+        const messages = conversation.getMessagesFromMark();
+        conversation.mark();
+        let chat = false;
+        for (const message of messages) {
+            switch (message.role) {
+                case 'user': {
+                    chat = true;
+                    break;
+                }
+                case 'assistant':
+                case 'system':
+                    this.stopTyping(conversation);
+                    await this.sendToDiscord(channel, message);
+                    break;
             }
-            channel.isProcessing = true;
+        }
+        if (chat) {
+            this.startTyping(conversation);
             try {
-                // Chat with bot
-                const conversation = this.getConversation(channel.id);
-                await this.chat(conversation.messages, conversation.language, channel);
-            } finally {
-                channel.isProcessing = false;
-                channel.processTimeout = null;
+                await this.chat(conversation);
+            } catch (error) {
+                console.error(error);
             }
-        }, settings.chat_process_delay_ms + timingVariance);
+        }
+    }
+
+    private startTyping(conversation: Conversation, timeoutMs = 5000) {
+        if (!this.typingTimeout) {
+            // Send typing every few seconds as long as bot is working
+            conversation.context.sendTyping();
+            this.typingTimeout = setTimeout(() => {
+                this.typingTimeout = undefined;
+                this.startTyping(conversation);
+            }, timeoutMs);
+        }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    private stopTyping(_conversation: Conversation) {
+        if (this.typingTimeout) {
+            clearTimeout(this.typingTimeout);
+            this.typingTimeout = undefined;
+        }
+    }
+
+    private async sendToDiscord(channel: any, response: ConvMessage, chunkSize = 1000) {
+        const numChunks = Math.ceil(response.content.length / chunkSize);
+
+        console.log(`[${channel.id}] ${response.sender}: ${response.content}`);
+
+        for (let chunk = 0, idx = 0; chunk < numChunks; ++chunk, idx += chunkSize) {
+            await channel.send(response.content.slice(idx, idx + chunkSize));
+        }
     }
 }

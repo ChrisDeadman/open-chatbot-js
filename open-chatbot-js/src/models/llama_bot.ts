@@ -1,18 +1,16 @@
 import type { Generate } from '@llama-node/llama-cpp';
 import { LLM } from 'llama-node';
 import { LLamaCpp, type LoadConfig } from 'llama-node/dist/llm/llama-cpp.js';
-import { ConvMessage, buildPrompt } from '../utils/conv_message.js';
+import { Conversation } from '../utils/conversation.js';
 import { buildStoppingStrings, filterResponse } from '../utils/llama_utils.js';
 import { BotModel } from './bot_model.js';
 
 export class LlamaBot implements BotModel {
-    name: string;
     llm: LLM;
 
     private config: LoadConfig;
 
-    constructor(name: string, model: string, maxTokens: number) {
-        this.name = name;
+    constructor(model: string, maxTokens: number) {
         this.llm = new LLM(LLamaCpp);
         this.config = {
             modelPath: model,
@@ -38,12 +36,13 @@ export class LlamaBot implements BotModel {
         }
     }
 
-    async chat(messages: ConvMessage[]): Promise<string> {
+    async chat(conversation: Conversation): Promise<string> {
+        const messages = await conversation.getPrompt();
         console.debug(`Llama: chat with ${messages.length} messages...`);
         const startTime = Date.now();
         try {
             const stoppingStrings = buildStoppingStrings(messages);
-            const prompt = await buildPrompt(messages);
+            const prompt = await conversation.getPromptString(messages);
             const stopSequence = '</s>';
             const params = this.buildParams(prompt, stopSequence);
 
@@ -51,6 +50,8 @@ export class LlamaBot implements BotModel {
                 // wait until finished
             });
             const response = String(completion.tokens.join(''));
+
+            //console.debug(`Llama DEBUG:\n${prompt}${response}`);
 
             const endTime = Date.now();
             const elapsedMs = endTime - startTime;

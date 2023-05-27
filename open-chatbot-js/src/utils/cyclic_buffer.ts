@@ -26,13 +26,15 @@ export class CyclicBuffer<T> implements Iterable<T> {
         this.curItemIndex = -1;
     }
 
-    push(item: T): void {
-        this.curItemIndex = (this.curItemIndex + 1) % this.capacity;
-        this.items[this.curItemIndex] = item;
-        if (this.firstItemIndex < 0) {
-            this.firstItemIndex = 0;
-        } else if (this.curItemIndex <= this.firstItemIndex) {
-            this.firstItemIndex = (this.firstItemIndex + 1) % this.capacity;
+    push(...items: T[]): void {
+        for (const item of items) {
+            this.curItemIndex = (this.curItemIndex + 1) % this.capacity;
+            this.items[this.curItemIndex] = item;
+            if (this.firstItemIndex < 0) {
+                this.firstItemIndex = 0;
+            } else if (this.curItemIndex <= this.firstItemIndex) {
+                this.firstItemIndex = (this.firstItemIndex + 1) % this.capacity;
+            }
         }
     }
 

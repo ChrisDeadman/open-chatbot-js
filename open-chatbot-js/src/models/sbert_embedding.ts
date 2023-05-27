@@ -1,26 +1,22 @@
 import { exec } from 'child_process';
 import { EmbeddingModel } from './embedding_model.js';
 import { TokenModel } from './token_model.js';
-import { ConvMessage, buildPrompt } from '../utils/conv_message.js';
 import { TiktokenModel, encoding_for_model } from '@dqbd/tiktoken';
 
-export class SbertEmbedding extends TokenModel implements EmbeddingModel {
+export class SbertEmbedding implements TokenModel, EmbeddingModel {
     dimension = 768;
     maxTokens: number;
     private model: string;
 
     constructor(model: string, maxTokens: number) {
-        super();
         this.model = model;
         this.maxTokens = maxTokens;
     }
 
-    async tokenize(messages: ConvMessage[]): Promise<number[]> {
-        if (messages.length <= 0) {
+    async tokenize(content: string): Promise<number[]> {
+        if (content.length <= 0) {
             return [];
         }
-
-        const content = await buildPrompt(messages);
 
         // TODO proper tokenizing
         const enc = encoding_for_model('text-embedding-ada-002' as TiktokenModel);
@@ -31,19 +27,18 @@ export class SbertEmbedding extends TokenModel implements EmbeddingModel {
         }
     }
 
-    async createEmbedding(messages: ConvMessage[]): Promise<number[]> {
-        if (messages.length <= 0) {
+    async createEmbedding(content: string): Promise<number[]> {
+        if (content.length <= 0) {
             return [];
         }
 
-        console.debug(`SbertEmbedding: createEmbedding with ${messages.length} messages...`);
+        console.debug(`SbertEmbedding: createEmbedding for ${content.length} chars...`);
         const startTime = Date.now();
 
-        const prompt = await buildPrompt(messages);
         const output = await this.runPythonScript('utils/sbert-embedding.py', [
             '--model',
             `"${this.model}"`,
-            `'${prompt.replace(/'/g, `'"'"'`)}'`,
+            `'${content.replace(/'/g, `'"'"'`)}'`,
         ]);
         const embeddings = JSON.parse(output);
 

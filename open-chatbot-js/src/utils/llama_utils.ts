@@ -38,7 +38,7 @@ export function filterResponse(response: string, stoppingStrings: string[]): str
         'gi'
     );
     const filtered = response
-        .replace('^\\s*[`]*\\s*$', '')
+        .replace(/^\s*[`]+\s*$/, '')
         .replaceAll('\\\\_', '_')
         .replaceAll('\\_', '_')
         .replaceAll('\\*', '*')

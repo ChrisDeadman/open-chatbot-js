@@ -26,11 +26,11 @@
                   </div>
                   <div class="form-group">
                     <label for="botname" class="py-2">Bot Name:</label>
-                    <input type="text" id="botname" class="form-control py-2" value="<%= botname %>" />
+                    <input type="text" id="botname" class="form-control py-2" value="<%= settings.bot_name %>" />
                   </div>
                   <div class="form-group">
                     <label for="language" class="py-2">Language:</label>
-                    <input type="text" id="language" class="form-control py-2" value="<%= language %>" />
+                    <input type="text" id="language" class="form-control py-2" value="<%= settings.language %>" />
                   </div>
                   <div class="modal-footer">
                     <button type="submit" class="btn btn-primary" data-bs-dismiss="modal">Save</button>
@@ -49,35 +49,35 @@
                 <form id="promptForm" class="modal-body">
                   <div class="form-group">
                     <label for="systemMessage" class="py-2">System Message:</label>
-                    <textarea id="systemMessage" class="form-control py-2" rows="1"><%= prompt_templates.system_message %></textarea>
+                    <textarea id="systemMessage" class="form-control py-2" rows="1"><%= settings.prompt_templates.system_message %></textarea>
                   </div>
                   <div class="form-group">
                     <label for="userMessage" class="py-2">User Message:</label>
-                    <textarea id="userMessage" class="form-control py-2" rows="1"><%= prompt_templates.user_message %></textarea>
+                    <textarea id="userMessage" class="form-control py-2" rows="1"><%= settings.prompt_templates.user_message %></textarea>
                   </div>
                   <div class="form-group">
                     <label for="assistantMessage" class="py-2">Assistant Message:</label>
-                    <textarea id="assistantMessage" class="form-control py-2" rows="1"><%= prompt_templates.assistant_message %></textarea>
+                    <textarea id="assistantMessage" class="form-control py-2" rows="1"><%= settings.prompt_templates.assistant_message %></textarea>
                   </div>
                   <div class="form-group">
                     <label for="suffix" class="py-2">Suffix:</label>
-                    <textarea id="suffix" class="form-control py-2" rows="1"><%= prompt_templates.suffix %></textarea>
+                    <textarea id="suffix" class="form-control py-2" rows="1"><%= settings.prompt_templates.suffix.join("\n") %></textarea>
                   </div>
                   <div class="form-group">
                     <label for="prefix" class="py-2">Prefix:</label>
-                    <textarea id="prefix" class="form-control py-2" rows="15"><%= prompt_templates.prefix.join('\n') %></textarea>
+                    <textarea id="prefix" class="form-control py-2" rows="15"><%= settings.prompt_templates.prefix.join('\n') %></textarea>
                   </div>
                   <div class="form-group">
                     <label for="history" class="py-2">History:</label>
-                    <textarea id="history" class="form-control py-2" rows="15"><%= prompt_templates.history.join('\n') %></textarea>
+                    <textarea id="history" class="form-control py-2" rows="15"><%= settings.prompt_templates.history.join('\n') %></textarea>
                   </div>
                   <div class="form-group">
                     <label for="tools" class="py-2">Tools:</label>
-                    <textarea id="tools" class="form-control py-2" rows="15"><%= prompt_templates.tools.join('\n') %></textarea>
+                    <textarea id="tools" class="form-control py-2" rows="15"><%= settings.prompt_templates.tools.join('\n') %></textarea>
                   </div>
                   <div class="form-group">
                     <label for="botBrowserPrompt" class="py-2">Bot-Browser Prompt:</label>
-                    <textarea id="botBrowserPrompt" class="form-control py-2" rows="10"><%= prompt_templates.bot_browser.join('\n') %></textarea>
+                    <textarea id="botBrowserPrompt" class="form-control py-2" rows="10"><%= settings.prompt_templates.bot_browser.join('\n') %></textarea>
                   </div>
                   <div class="modal-footer">
                     <button type="submit" class="btn btn-primary" data-bs-dismiss="modal">Save</button>

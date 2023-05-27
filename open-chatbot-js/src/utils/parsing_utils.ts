@@ -77,9 +77,9 @@ export function commandToString(cmd: Record<string, string>, contentOnly = false
             continue;
         }
         if (entries.length > 1) {
-            content.push(`${key}: ${value}`);
+            content.push(`${key}: ${value.trim()}`);
         } else {
-            content.push(value);
+            content.push(value.trim());
         }
     }
 
@@ -89,7 +89,7 @@ export function commandToString(cmd: Record<string, string>, contentOnly = false
         } else {
             content.unshift('```');
         }
-        content.push('```\n');
+        content.push('```');
     }
     return content.join('\n');
 }

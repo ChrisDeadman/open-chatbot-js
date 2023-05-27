@@ -126,7 +126,7 @@ export class SpeechApi {
                             } else {
                                 if (transcript.length > 0 && transcript != triggerWord) {
                                     const result = event.results[event.resultIndex];
-                                    const isFinal = result.isFinal == true;
+                                    const isFinal = result.isFinal === true;
                                     console.log(`Heard: ${transcript}${isFinal ? '.' : '...'}`);
 
                                     // Stop recognition when user stops speaking

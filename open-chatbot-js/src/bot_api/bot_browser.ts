@@ -4,7 +4,9 @@ import { settings } from '../settings.js';
 
 import { PromptTemplate } from 'langchain/prompts';
 import { BotModel } from '../models/bot_model.js';
+import { TokenModel } from '../models/token_model.js';
 import { ConvMessage } from '../utils/conv_message.js';
+import { Conversation } from '../utils/conversation.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
 
 class PageData {
@@ -26,11 +28,13 @@ class PageData {
 
 export class BotBrowser {
     private botModel: BotModel;
+    private tokenModel: TokenModel;
     private browser: Browser;
     private pages: { [key: string]: { [key: string]: PageData } } = {};
 
-    constructor(botModel: BotModel, browser: Browser) {
+    constructor(botModel: BotModel, tokenModel: TokenModel, browser: Browser) {
         this.botModel = botModel;
+        this.tokenModel = tokenModel;
         this.browser = browser;
     }
 
@@ -154,9 +158,9 @@ export class BotBrowser {
                 });
 
                 // generate updated summary
-                pageData.summary = await this.botModel.chat([
-                    new ConvMessage('system', 'system', prompt),
-                ]);
+                const conversation = new Conversation(settings, this.tokenModel);
+                conversation.push(new ConvMessage('system', 'system', prompt));
+                pageData.summary = await this.botModel.chat(conversation);
             }
 
             // Update status

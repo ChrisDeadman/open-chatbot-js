@@ -4,7 +4,6 @@ import { toFloat32Buffer } from '../utils/conversion_utils.js';
 import { MemoryProvider } from './memory_provider.js';
 
 import { EmbeddingModel } from '../models/embedding_model.js';
-import { ConvMessage } from '../utils/conv_message.js';
 
 export class RedisMemory extends MemoryProvider {
     private redis: RedisClientType;
@@ -37,7 +36,7 @@ export class RedisMemory extends MemoryProvider {
         await this.createIndex();
     }
 
-    async add(context: ConvMessage[], data: string) {
+    async add(context: string, data: string) {
         const vector = await this.embeddingModel.createEmbedding(context);
         const dataDict = {
             data: data,
@@ -51,12 +50,9 @@ export class RedisMemory extends MemoryProvider {
         await this.redis.hSet(`${this.searchPrefix}:${id}`, dataDict);
     }
 
-    async del(context: ConvMessage[], data: string) {
+    async del(context: string, data: string) {
         const baseQuery = `*=>[KNN 1 @embedding $vector AS dist]`;
-        const vector = await this.embeddingModel.createEmbedding([
-            ...context,
-            new ConvMessage('assistant', 'assistant', data),
-        ]);
+        const vector = await this.embeddingModel.createEmbedding(`${context}\n${data}`);
         const results = await this.redis.ft.search(this.memoryIndex, baseQuery, {
             PARAMS: {
                 vector: toFloat32Buffer(vector),
@@ -76,7 +72,7 @@ export class RedisMemory extends MemoryProvider {
         await this.redis.del(docId);
     }
 
-    async get(context: ConvMessage[], numRelevant = 1): Promise<string[]> {
+    async get(context: string, numRelevant = 1): Promise<string[]> {
         const baseQuery = `*=>[KNN ${numRelevant} @embedding $vector AS dist]`;
         const vector = await this.embeddingModel.createEmbedding(context);
         const results = await this.redis.ft.search(this.memoryIndex, baseQuery, {

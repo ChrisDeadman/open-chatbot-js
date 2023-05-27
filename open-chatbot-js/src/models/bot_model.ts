@@ -1,6 +1,5 @@
-import { ConvMessage } from '../utils/conv_message.js';
+import { Conversation } from '../utils/conversation.js';
 
 export interface BotModel {
-    name: string;
-    chat: (messages: ConvMessage[]) => Promise<string>;
+    chat: (conversation: Conversation) => Promise<string>;
 }

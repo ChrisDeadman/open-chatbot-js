@@ -6,31 +6,28 @@ import { CommandApi } from '../bot_api/command_api.js';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
 import { TokenModel } from '../models/token_model.js';
-import { settings } from '../settings.js';
 import { ConvMessage } from '../utils/conv_message.js';
-import { CyclicBuffer } from '../utils/cyclic_buffer.js';
+import { Conversation, ConversationEvents } from '../utils/conversation.js';
 import { BotClient } from './bot_client.js';
 
 export class WebClient extends BotClient {
     private app: express.Express;
     private server: http.Server;
     private io: Server;
-    protected conversation: CyclicBuffer<ConvMessage>;
+    protected conversation: Conversation;
     private username;
-    private language;
-    private chatting = false;
 
     constructor(
+        settings: any,
         botModel: BotModel,
         tokenModel: TokenModel,
-        memory: MemoryProvider,
         botApiHandler: CommandApi,
+        memory: MemoryProvider | undefined = undefined,
         username = 'User'
     ) {
-        super(botModel, tokenModel, memory, botApiHandler);
+        super(botModel, tokenModel, botApiHandler);
         this.username = username;
-        this.language = settings.language;
-        this.conversation = new CyclicBuffer(settings.message_history_size);
+        this.conversation = new Conversation(settings, tokenModel, memory);
 
         this.app = express();
         this.server = http.createServer(this.app);
@@ -48,46 +45,46 @@ export class WebClient extends BotClient {
             this.conversation.clear();
             res.render('index', {
                 username: this.username,
-                botname: this.botModel.name,
-                language: this.language,
-                prompt_templates: settings.prompt_templates,
+                settings: this.conversation.settings,
             });
         });
 
         this.io.on('connection', socket => {
-            socket.on('chat message', async msg => {
-                this.chatting = true;
+            socket.on('chat message', async messsage => {
                 try {
-                    msg = msg.trimStart();
-                    if (msg.length > 0) {
+                    messsage = messsage.trimStart();
+                    if (messsage.length > 0) {
                         // Add new message to conversation
-                        this.conversation.push(new ConvMessage('user', this.username, `${msg}`));
-
-                        // Chat with bot
-                        await this.chat(this.conversation, this.language);
+                        this.conversation.push(new ConvMessage('user', this.username, messsage));
                     }
                 } catch (error) {
                     console.error(error);
-                } finally {
-                    this.chatting = false;
                 }
             });
             socket.on('update settings', async settings => {
                 this.username = settings.username;
-                this.botModel.name = settings.botname;
-                this.language = settings.language;
+                for (const [key, value] of Object.entries(settings)) {
+                    this.conversation.settings[key] = value;
+                }
             });
             socket.on('update prompt', async prompt_templates => {
-                settings.prompt_templates = prompt_templates;
+                for (const [key, value] of Object.entries(prompt_templates)) {
+                    this.conversation.settings.prompt_templates[key] = value;
+                }
             });
         });
 
-        this.server.listen(settings.web_server_port, settings.web_server_host, () => {
-            console.log(
-                `web-client listening on http://${settings.web_server_host}:${settings.web_server_port}`
-            );
-        });
+        this.server.listen(
+            this.conversation.settings.web_server_port,
+            this.conversation.settings.web_server_host,
+            () => {
+                console.log(
+                    `web-client listening on http://${this.conversation.settings.web_server_host}:${this.conversation.settings.web_server_port}`
+                );
+            }
+        );
 
+        this.conversation.on(ConversationEvents.Updated, this.onConversationUpdated.bind(this));
         console.log('Bot startup complete.');
     }
 
@@ -96,23 +93,38 @@ export class WebClient extends BotClient {
         console.log('Bot has been shut down.');
     }
 
-    async handleResponse(_context: any, response: string): Promise<void> {
-        if (this.chatting) {
-            response = `${this.botModel.name}: ${response.trim()}`;
-        } else {
-            response = response.trim();
+    async onConversationUpdated(conversation: Conversation) {
+        const messages = conversation.getMessagesFromMark();
+        conversation.mark();
+        let chat = false;
+        for (const message of messages) {
+            switch (message.role) {
+                case 'user': {
+                    if (message.sender != this.username) {
+                        this.io.emit('chat message', `${message.sender}: ${message.content}`);
+                    }
+                    chat = true;
+                    break;
+                }
+                case 'assistant':
+                    this.io.emit(
+                        'stop typing',
+                        `${conversation.settings.bot_name} stopped typing.`
+                    );
+                    this.io.emit('chat message', `${message.sender}: ${message.content}`);
+                    break;
+                case 'system':
+                    this.io.emit('chat message', message.content);
+                    break;
+            }
         }
-
-        this.io.emit('chat message', response);
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    startTyping(_context: any): void {
-        this.io.emit('typing', `${this.botModel.name} is typing...`);
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    stopTyping(_context: any): void {
-        this.io.emit('stop typing', `${this.botModel.name} stopped typing.`);
+        if (chat) {
+            try {
+                this.io.emit('typing', `${conversation.settings.bot_name} is typing...`);
+                await this.chat(conversation);
+            } catch (error) {
+                console.error(error);
+            }
+        }
     }
 }

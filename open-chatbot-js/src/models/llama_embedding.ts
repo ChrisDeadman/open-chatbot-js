@@ -1,11 +1,10 @@
 import type { Generate } from '@llama-node/llama-cpp';
 import { LLM } from 'llama-node';
 import { LLamaCpp, type LoadConfig } from 'llama-node/dist/llm/llama-cpp.js';
-import { ConvMessage, buildPrompt } from '../utils/conv_message.js';
 import { EmbeddingModel } from './embedding_model.js';
 import { TokenModel } from './token_model.js';
 
-export class LlamaEmbedding extends TokenModel implements EmbeddingModel {
+export class LlamaEmbedding implements TokenModel, EmbeddingModel {
     dimension: number;
     maxTokens: number;
 
@@ -13,7 +12,6 @@ export class LlamaEmbedding extends TokenModel implements EmbeddingModel {
     private config: LoadConfig;
 
     constructor(model: string, maxTokens: number) {
-        super();
         this.maxTokens = maxTokens;
         this.llm = new LLM(LLamaCpp);
         this.config = {
@@ -42,25 +40,23 @@ export class LlamaEmbedding extends TokenModel implements EmbeddingModel {
         console.info(`LlamaEmbedding: embedding dimension is ${this.dimension}.`);
     }
 
-    async tokenize(messages: ConvMessage[]): Promise<number[]> {
-        if (messages.length <= 0) {
+    async tokenize(content: string): Promise<number[]> {
+        if (content.length <= 0) {
             return [];
         }
 
-        const content = await buildPrompt(messages);
         return this.llm.tokenize(content);
     }
 
-    async createEmbedding(messages: ConvMessage[]): Promise<number[]> {
-        if (messages.length <= 0) {
+    async createEmbedding(content: string): Promise<number[]> {
+        if (content.length <= 0) {
             return [];
         }
 
-        console.debug(`LlamaEmbedding: createEmbedding with ${messages.length} messages...`);
+        console.debug(`LlamaEmbedding: createEmbedding for ${content.length} chars...`);
         const startTime = Date.now();
 
-        const prompt = await buildPrompt(messages);
-        const params = this.buildParams(prompt);
+        const params = this.buildParams(content);
 
         const embedding = await this.llm.getEmbedding(params);
 

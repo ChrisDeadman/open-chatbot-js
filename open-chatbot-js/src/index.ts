@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { hideBin } from 'yargs/helpers';
 import yargs from 'yargs/yargs';
-import { loadSettings, settings } from './settings.js';
+import { loadSettings, readSettings, settings } from './settings.js';
 
 import { BotModel } from './models/bot_model.js';
 import { OpenAIBot } from './models/openai_bot.js';
@@ -21,26 +21,34 @@ import { RedisMemory } from './memory/redis_memory_provider.js';
 import { EmbeddingModel } from './models/embedding_model.js';
 import { LlamaBot } from './models/llama_bot.js';
 import { LlamaEmbedding } from './models/llama_embedding.js';
-import { TokenModel } from './models/token_model.js';
 import { SbertEmbedding } from './models/sbert_embedding.js';
+import { TokenModel } from './models/token_model.js';
 
 function createClient(
     command: string,
     botModel: BotModel,
     tokenModel: TokenModel,
-    memory: MemoryProvider,
+    memory: MemoryProvider | undefined,
     speech: SpeechApi,
     botApiHandler: CommandApi
 ): BotClient {
+    const botSettings = JSON.parse(JSON.stringify(settings));
     switch (command) {
         case 'discord':
-            return new DiscordClient(botModel, tokenModel, memory, botApiHandler);
+            return new DiscordClient(botSettings, botModel, tokenModel, botApiHandler, memory);
         case 'sttts':
-            return new STTTSClient(botModel, tokenModel, memory, speech, botApiHandler);
+            return new STTTSClient(
+                botSettings,
+                botModel,
+                tokenModel,
+                speech,
+                botApiHandler,
+                memory
+            );
         case 'web':
-            return new WebClient(botModel, tokenModel, memory, botApiHandler);
+            return new WebClient(botSettings, botModel, tokenModel, botApiHandler, memory);
         default:
-            return new TerminalClient(botModel, tokenModel, memory, botApiHandler);
+            return new TerminalClient(botSettings, botModel, tokenModel, botApiHandler, memory);
     }
 }
 
@@ -82,23 +90,13 @@ switch (settings.bot_backend) {
         break;
     }
     case 'webui':
-        botModel = new WebUIBot(
-            settings.bot_name,
-            settings.bot_model,
-            settings.bot_model_token_limit
-        );
+        botModel = new WebUIBot(settings.bot_model, settings.bot_model_token_limit);
         break;
     default: {
         if (!fs.existsSync(settings.bot_model)) {
-            throw new Error(
-                `${settings.bot_model} does not exist, please check settings.json.`
-            );
+            throw new Error(`${settings.bot_model} does not exist, please check settings.json.`);
         }
-        const llamaBot = new LlamaBot(
-            settings.bot_name,
-            settings.bot_model,
-            settings.bot_model_token_limit
-        );
+        const llamaBot = new LlamaBot(settings.bot_model, settings.bot_model_token_limit);
         await llamaBot.init();
         botModel = llamaBot;
         break;
@@ -134,14 +132,18 @@ switch (settings.embedding_backend) {
 }
 
 // Create the memory model
-const memory = new RedisMemory(
-    settings.redis_host,
-    settings.redis_port,
-    embeddingModel,
-    `idx:${settings.bot_name}:memory`
-);
-await memory.init();
-await memory.clear(); // TODO: Clear always for now
+let memory: MemoryProvider | undefined;
+if (settings.memory_provider === 'redis') {
+    const redisMemory = new RedisMemory(
+        settings.redis_host,
+        settings.redis_port,
+        embeddingModel,
+        `idx:${settings.bot_name}:memory`
+    );
+    await redisMemory.init();
+    await redisMemory.clear(); // TODO: Clear always for now
+    memory = redisMemory;
+}
 
 // Create the browser
 const browser = await startBrowser(true);
@@ -150,7 +152,7 @@ const browser = await startBrowser(true);
 const speech = new SpeechApi(browser);
 
 // Create the bot browser
-const botBrowser: BotBrowser | undefined = new BotBrowser(botModel, browser);
+const botBrowser: BotBrowser | undefined = new BotBrowser(botModel, tokenModel, browser);
 
 // Create the Bot API Handler
 const botApiHandler = new CommandApi(botModel, memory, botBrowser);

@@ -1,29 +1,19 @@
-import { PromptTemplate } from 'langchain/prompts';
 import { Command, CommandApi } from '../bot_api/command_api.js';
-import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
 import { TokenModel } from '../models/token_model.js';
-import { settings } from '../settings.js';
 import { ConvMessage } from '../utils/conv_message.js';
-import { dateTimeToStr } from '../utils/conversion_utils.js';
-import { CyclicBuffer } from '../utils/cyclic_buffer.js';
+import { Conversation } from '../utils/conversation.js';
 import { commandToString, parseCommandBlock, parseJsonCommands } from '../utils/parsing_utils.js';
 
 export abstract class BotClient {
-    public botModel: BotModel;
-    public tokenModel: TokenModel;
-    public memory: MemoryProvider;
+    botModel: BotModel;
+    tokenModel: TokenModel;
     protected botApiHandler: CommandApi;
+    private chatting = false;
 
-    constructor(
-        botModel: BotModel,
-        tokenModel: TokenModel,
-        memory: MemoryProvider,
-        botApiHandler: CommandApi
-    ) {
+    constructor(botModel: BotModel, tokenModel: TokenModel, botApiHandler: CommandApi) {
         this.botModel = botModel;
         this.tokenModel = tokenModel;
-        this.memory = memory;
         this.botApiHandler = botApiHandler;
     }
 
@@ -31,44 +21,21 @@ export abstract class BotClient {
 
     abstract shutdown(): Promise<void>;
 
-    protected abstract handleResponse(context: any, response: string): Promise<void>;
-
-    protected abstract startTyping(context: any): void;
-
-    protected abstract stopTyping(context: any): void;
-
-    protected async chat(
-        conversation: CyclicBuffer<ConvMessage>,
-        language: string,
-        context: any = null,
-        allowCommands = true
-    ) {
-        const conv_list = [...conversation];
-
-        // Start typing
-        this.startTyping(context);
+    async chat(conversation: Conversation): Promise<ConvMessage> {
+        // Ignore if already chatting
+        if (this.chatting) {
+            return new ConvMessage('system', 'system', '');
+        }
+        this.chatting = true;
         try {
-            // get memory vector related to conversation context
-            const memContext = await this.tokenModel.truncateMessages(
-                conv_list.filter(msg => msg.role != 'system')
-            );
+            // Chat with bot
+            const response = await this.botModel.chat(conversation);
 
-            // chat with bot
-            const messages = await this.getMessages(conv_list, memContext, language);
-            const response = await this.botModel.chat(messages);
-
-            // parse bot response
-            const responseData = this.parseResponse(response);
-
-            // store the bot response
-            if (responseData.message.length > 0) {
-                conversation.push(
-                    new ConvMessage('assistant', this.botModel.name, responseData.message)
-                );
-            }
+            // Parse bot response
+            const responseData = this.parseResponse(response, conversation.settings.bot_name);
 
             // Execute commands
-            if (allowCommands && responseData.commands.length > 0) {
+            if (conversation.settings.allow_commands === true && responseData.commands.length > 0) {
                 responseData.commands.forEach((cmd: Record<string, string>) => {
                     console.debug(`CMD: ${JSON.stringify(cmd)}`);
                     switch (cmd.command) {
@@ -79,113 +46,53 @@ export abstract class BotClient {
                         default:
                             break;
                     }
-                    this.botApiHandler.handleRequest(cmd, memContext, language).then(result => {
-                        // Add API response to system messages when finished
-                        if (result.length > 0) {
-                            conversation.push(
-                                new ConvMessage(
-                                    'system',
-                                    'system',
-                                    result.slice(0, this.tokenModel.maxTokens / 2) // limit text
-                                )
-                            );
-                            this.handleResponse(context, result);
-                        }
-                    });
+                    this.botApiHandler
+                        .handleRequest(
+                            cmd,
+                            conversation.memoryContext,
+                            conversation.settings.language
+                        )
+                        .then(result => {
+                            if (result.length > 0) {
+                                // Add API response to system messages
+                                conversation.push(
+                                    new ConvMessage(
+                                        'system',
+                                        'system',
+                                        result.slice(0, this.tokenModel.maxTokens / 2) // limit text
+                                    )
+                                );
+                            }
+                        });
                 });
             }
 
-            // Display message to the client
-            if (responseData.message.length > 0) {
-                await this.handleResponse(context, responseData.message);
+            // Build response message
+            const message = new ConvMessage(
+                'assistant',
+                conversation.settings.bot_name,
+                responseData.message
+            );
+
+            // Push the bot response
+            if (message.content.length > 0) {
+                conversation.push(message);
             }
+
+            return message;
         } catch (error) {
-            // Display error to the client
-            await this.handleResponse(context, String(error));
+            // Push the error response
+            const message = new ConvMessage('system', 'system', String(error));
+            conversation.push(message);
+            return message;
         } finally {
-            // Stop typing
-            this.stopTyping(context);
+            this.chatting = false;
         }
     }
 
-    protected async getMessages(
-        conversation: ConvMessage[],
-        memoryContext: ConvMessage[],
-        language: string
-    ): Promise<ConvMessage[]> {
-        const messages: ConvMessage[] = [];
-
-        // parse tools
-        const toolsTemplate = new PromptTemplate({
-            inputVariables: [...Object.keys(settings), 'now'],
-            template: settings.prompt_templates.tools.join('\n'),
-        });
-        const tools = await toolsTemplate.format({
-            ...settings,
-            language: language,
-            now: dateTimeToStr(new Date(), settings.locale),
-        });
-
-        // parse prefix
-        const prefixTemplate = new PromptTemplate({
-            inputVariables: [...Object.keys(settings), 'tools', 'now'],
-            template: settings.prompt_templates.prefix.join('\n'),
-        });
-        const prefix = await prefixTemplate.format({
-            ...settings,
-            language: language,
-            tools: tools,
-            now: dateTimeToStr(new Date(), settings.locale),
-        });
-
-        // parse history
-        const historyTemplate = new PromptTemplate({
-            inputVariables: [...Object.keys(settings), 'now'],
-            template: settings.prompt_templates.history.join('\n'),
-        });
-        const history = await historyTemplate.format({
-            ...settings,
-            language: language,
-            now: dateTimeToStr(new Date(), settings.locale),
-        });
-
-        // combine and add them to the memories
-        const combined = `${prefix}\n${history}`;
-        if (combined.length >= 0) {
-            messages.push(new ConvMessage('system', 'system', combined));
-        }
-
-        if (memoryContext.length > 0) {
-            // get memories related to the memory vector
-            const memories = (await this.memory.get(memoryContext, 10)).map(
-                m => new ConvMessage('system', 'memory', m)
-            );
-
-            // add limited amount of memories
-            const memoriesLimited = await this.tokenModel.truncateMessages(
-                memories,
-                this.tokenModel.maxTokens / 2
-            );
-            memoriesLimited.forEach(m => messages.push(m));
-        }
-
-        // add most recent messages, save some tokens for the response
-        const currentTokens = await this.tokenModel.tokenize(messages);
-        const messagesLimited = await this.tokenModel.truncateMessages(
-            conversation,
-            -(currentTokens.length + 512)
-        );
-        messagesLimited.forEach(m => messages.push(m));
-
-        return messages;
-    }
-
-    protected parseResponse(response: string): any {
+    protected parseResponse(response: string, botName: string): any {
         // Strip end-of-previous-sentence and the bot name
-        response = response.replace(
-            new RegExp(`\\p{P}*\\n*\\s*${this.botModel.name}:\\s*`, 'u'),
-            ''
-        );
+        response = response.replace(new RegExp(`\\p{P}*\\n*\\s*${botName}:\\s*`, 'u'), '');
 
         // Strip excess newlines
         response = response

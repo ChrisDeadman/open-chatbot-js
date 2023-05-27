@@ -2,7 +2,6 @@ import axios from 'axios';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
 import { settings } from '../settings.js';
-import { ConvMessage } from '../utils/conv_message.js';
 import { commandToString, extractURLs } from '../utils/parsing_utils.js';
 import { BotBrowser } from './bot_browser.js';
 
@@ -17,9 +16,9 @@ export enum Command {
 export class CommandApi {
     botModel: BotModel;
     botBrowser?: BotBrowser;
-    memory: MemoryProvider;
+    memory: MemoryProvider | undefined;
 
-    constructor(botModel: BotModel, memory: MemoryProvider, botBrowser?: BotBrowser) {
+    constructor(botModel: BotModel, memory?: MemoryProvider, botBrowser?: BotBrowser) {
         this.botModel = botModel;
         this.memory = memory;
         this.botBrowser = botBrowser;
@@ -27,7 +26,7 @@ export class CommandApi {
 
     async handleRequest(
         commandArgs: Record<string, string>,
-        memContext: ConvMessage[],
+        memContext: string,
         language: string
     ): Promise<string> {
         let response = '';
@@ -37,13 +36,13 @@ export class CommandApi {
         try {
             switch (commandArgs.command) {
                 case Command.StoreMemory: {
-                    if (commandContent.length > 0 && memContext.length > 0) {
+                    if (this.memory && commandContent.length > 0 && memContext.length > 0) {
                         await this.memory.add(memContext, commandContent);
                     }
                     break;
                 }
                 case Command.DeleteMemory: {
-                    if (commandContent.length > 0 && memContext.length > 0) {
+                    if (this.memory && commandContent.length > 0 && memContext.length > 0) {
                         await this.memory.del(memContext, commandContent);
                     }
                     break;
