@@ -1,10 +1,11 @@
 const socket = io();
 const messages = document.getElementById("messages");
-const typing = document.getElementById("typing");
 const settingsForm = document.getElementById("settingsForm");
 const promptForm = document.getElementById("promptForm");
 const messageForm = document.getElementById("messageForm");
 const userInput = document.getElementById("userInput");
+
+let typing = false;
 
 marked.setOptions({
   breaks: true,
@@ -35,37 +36,46 @@ const typingIndicator = buildMessageContainer(
 
 settingsForm.addEventListener("submit", function (e) {
   e.preventDefault();
-  username = document.getElementById("username").value;
-  bot_name = document.getElementById("botname").value;
-  language = document.getElementById("language").value;
-  socket.emit("update settings", {
-    username,
-    bot_name,
-    language,
+  socket.emit("update settings", formToJson(settingsForm));
+  // reset display values to match sliders
+  Array.from(document.querySelectorAll('input[type="range"]')).forEach(
+    updateDisplayField
+  );
+});
+
+// Add event listener to update slider display values
+Array.from(document.querySelectorAll('input[type="range"]')).forEach(function (
+  slider
+) {
+  slider.addEventListener("input", function (e) {
+    updateDisplayField(e.target);
   });
 });
 
+function updateDisplayField(target) {
+  const displayFieldId = target.getAttribute("data-display");
+  if (displayFieldId) {
+    const displayField = document.getElementById(displayFieldId);
+    if (displayField) {
+      displayField.value = target.value;
+    }
+  }
+}
+
 promptForm.addEventListener("submit", function (e) {
   e.preventDefault();
-  socket.emit("update prompt", {
-    system_message: document.getElementById("systemMessage").value,
-    user_message: document.getElementById("userMessage").value,
-    assistant_message: document.getElementById("assistantMessage").value,
-    suffix: document.getElementById("suffix").value.split("\n"),
-    prefix: document.getElementById("prefix").value.split("\n"),
-    history: document.getElementById("history").value.split("\n"),
-    tools: document.getElementById("tools").value.split("\n"),
-    bot_browser: document.getElementById("botBrowserPrompt").value.split("\n"),
-  });
+  socket.emit("update settings", formToJson(promptForm));
 });
 
 messageForm.addEventListener("submit", function (e) {
   e.preventDefault();
   if (userInput.innerText) {
+    hideTypingIndicator();
+
     const bgStyle =
       messages.children.length % 2 == 0 ? "bg-secondary" : "bg-primary";
 
-    messages.appendChild(
+    addMessage(
       buildMessageContainer(
         buildMessageHeader(
           buildMessageIcon("fa-solid", "fa-user"),
@@ -75,7 +85,10 @@ messageForm.addEventListener("submit", function (e) {
         bgStyle
       )
     );
-    messages.scrollTop = messages.scrollHeight;
+
+    if (typing) {
+      showTypingIndicator();
+    }
 
     socket.emit(
       "chat message",
@@ -94,7 +107,7 @@ userInput.addEventListener("keydown", function (e) {
 });
 
 socket.on("chat message", function (sender, message) {
-  const botname = document.getElementById("botname").value;
+  const botname = document.getElementById("bot_name").value;
   var iconClass;
   switch (sender) {
     case botname:
@@ -107,10 +120,13 @@ socket.on("chat message", function (sender, message) {
       iconClass = "fa-user-secret";
       break;
   }
+
+  hideTypingIndicator();
+
   const bgStyle =
     messages.children.length % 2 == 0 ? "bg-secondary" : "bg-primary";
 
-  messages.appendChild(
+  addMessage(
     buildMessageContainer(
       buildMessageHeader(
         buildMessageIcon("fa-solid", iconClass),
@@ -120,10 +136,25 @@ socket.on("chat message", function (sender, message) {
       bgStyle
     )
   );
-  messages.scrollTop = messages.scrollHeight;
+
+  if (typing) {
+    showTypingIndicator();
+  }
 });
 
 socket.on("typing", function () {
+  typing = true;
+  showTypingIndicator();
+});
+
+socket.on("stop typing", function () {
+  typing = false;
+  hideTypingIndicator();
+});
+
+function showTypingIndicator() {
+  const scroll = shouldScroll(messages, 1);
+  messages.scrollHeight - (messages.scrollTop + messages.clientHeight) < 100;
   if (messages.children.length % 2 == 0) {
     typingIndicator.classList.remove("bg-primary");
     typingIndicator.classList.add("bg-secondary");
@@ -131,19 +162,42 @@ socket.on("typing", function () {
     typingIndicator.classList.remove("bg-secondary");
     typingIndicator.classList.add("bg-primary");
   }
-  messages.appendChild(typingIndicator);
-  messages.scrollTop = messages.scrollHeight;
-});
+  if (!messages.contains(typingIndicator)) {
+    messages.appendChild(typingIndicator);
+  }
+  if (scroll) {
+    messages.scrollTop = messages.scrollHeight;
+  }
+}
 
-socket.on("stop typing", function () {
-  messages.removeChild(typingIndicator);
-});
+function hideTypingIndicator() {
+  if (messages.contains(typingIndicator)) {
+    messages.removeChild(typingIndicator);
+  }
+}
+
+function addMessage(messageContainer) {
+  const scroll = shouldScroll(messages, 1);
+  messages.appendChild(messageContainer);
+  if (scroll) {
+    messages.scrollTop = messages.scrollHeight;
+  }
+}
+
+function shouldScroll(element, stepsFromBottom) {
+  let totalSteps = 20;
+  let stepSize = element.scrollHeight / totalSteps;
+  let stepsAway =
+    (element.scrollHeight - (element.scrollTop + element.clientHeight)) /
+    stepSize;
+  return stepsAway < stepsFromBottom;
+}
 
 function buildMessageElement(messageText) {
   // ensure code blocks always start at a new line and end with a newline
   messageText = messageText
-    .replaceAll(/(?<!^|\n)\`\`\`/g, "\n```")
-    .replaceAll(/^\`\`\`\s+/gm, "```\n");
+    .replaceAll(/(?<=[\p{P}\s]+)\s*[`]{2,}(\w+)\s*/gu, "\n```$1\n")
+    .replaceAll(/(?<![\t\f\v\r ]+)\n*[`]{2,}(?!\`|\w|\s*\n)/gm, "\n\`\`\`\n");
 
   // parse message as markdown
   const element = document.createElement("div");
@@ -230,4 +284,43 @@ function buildLanguageTitle(language) {
     "mb-0"
   );
   return element;
+}
+
+function formToJson(form) {
+  return Array.from(form.elements)
+    .filter((el) => el.id) // Exclude elements without id
+    .reduce((acc, el) => {
+      const keys = el.id.split("."); // Split keys by '.'
+      let currentLevel = acc; // Start at top level of the settings object
+
+      // Loop through all keys except the last one
+      for (let i = 0; i < keys.length - 1; i++) {
+        const key = keys[i];
+
+        // If key does not exist yet, create an empty object
+        if (!currentLevel[key]) {
+          currentLevel[key] = {};
+        }
+
+        // Move to the next level
+        currentLevel = currentLevel[key];
+      }
+
+      let value;
+      if (el.tagName === "TEXTAREA") {
+        // Text areas are converted to a list of lines
+        value = el.value.split("\n");
+      } else if (el.type === "number" || el.type === "range") {
+        // Numbers are parsed as float
+        value = parseFloat(el.value);
+      } else {
+        // Strings stay as they are
+        value = el.value;
+      }
+      
+      // Set the value at the deepest level
+      currentLevel[keys[keys.length - 1]] = value;
+
+      return acc;
+    }, {});
 }

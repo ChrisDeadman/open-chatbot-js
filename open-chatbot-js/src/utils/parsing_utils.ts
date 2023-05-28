@@ -42,7 +42,7 @@ export function parseJsonCommands(response: string): Record<string, string>[] {
 }
 
 export function parseCommandBlock(response: string): Record<string, string> | null {
-    const cmdMatchRegex = new RegExp(`^\\s*(${Object.values(Command).join('|')})\\s*([\\s\\S]*)`);
+    const cmdMatchRegex = new RegExp(`^\\s*(${Object.values(Command).join('|')})[\\s,\\p{P}]*([\\s\\S]*)`);
     const cmdMatch = response.trimStart().match(cmdMatchRegex);
     if (!cmdMatch || cmdMatch[1] === undefined) {
         return null;

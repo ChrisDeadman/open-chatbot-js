@@ -1,4 +1,3 @@
-import type { Generate } from '@llama-node/llama-cpp';
 import { LLM } from 'llama-node';
 import { LLamaCpp, type LoadConfig } from 'llama-node/dist/llm/llama-cpp.js';
 import { Conversation } from '../utils/conversation.js';
@@ -44,7 +43,17 @@ export class LlamaBot implements BotModel {
             const stoppingStrings = buildStoppingStrings(messages);
             const prompt = await conversation.getPromptString(messages);
             const stopSequence = '</s>';
-            const params = this.buildParams(prompt, stopSequence);
+            const params = {
+                prompt,
+                stopSequence,
+                temp: conversation.settings.bot_backend.temperature,
+                topP: conversation.settings.bot_backend.top_p,
+                topK: conversation.settings.bot_backend.top_k,
+                typicalP: conversation.settings.bot_backend.typical_p,
+                repeatPenalty: conversation.settings.bot_backend.repetition_penalty,
+                nTokPredict: conversation.settings.bot_backend.max_new_tokens,
+                nThreads: 16,
+            };
 
             const completion = await this.llm.createCompletion(params, () => {
                 // wait until finished
@@ -62,19 +71,5 @@ export class LlamaBot implements BotModel {
             console.error(`Llama: ${error}`);
         }
         return '';
-    }
-
-    private buildParams(prompt: string, stopSequence: string): Generate {
-        return {
-            prompt,
-            stopSequence,
-            temp: 0.7,
-            topP: 0.9,
-            topK: 4,
-            typicalP: 1.0,
-            repeatPenalty: 1.18,
-            nTokPredict: 512,
-            nThreads: 16,
-        };
     }
 }

@@ -62,14 +62,11 @@ export class WebClient extends BotClient {
                 }
             });
             socket.on('update settings', async settings => {
-                this.username = settings.username;
                 for (const [key, value] of Object.entries(settings)) {
                     this.conversation.settings[key] = value;
-                }
-            });
-            socket.on('update prompt', async prompt_templates => {
-                for (const [key, value] of Object.entries(prompt_templates)) {
-                    this.conversation.settings.prompt_templates[key] = value;
+                    if (key === 'username') {
+                        this.username = String(value);
+                    }
                 }
             });
         });

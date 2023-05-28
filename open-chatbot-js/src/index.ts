@@ -76,13 +76,13 @@ await loadSettings(argv.settings);
 let botModel: BotModel;
 let tokenModel: TokenModel | undefined;
 let embeddingModel: EmbeddingModel | undefined;
-switch (settings.bot_backend) {
+switch (settings.bot_backend.name) {
     case 'openai': {
         const openAiBot = new OpenAIBot(
             settings.bot_name,
-            settings.openai_api_key,
-            settings.bot_model,
-            settings.bot_model_token_limit
+            settings.bot_backend.api_key,
+            settings.bot_backend.model,
+            settings.bot_backend.token_limit
         );
         botModel = openAiBot;
         tokenModel = openAiBot;
@@ -90,33 +90,35 @@ switch (settings.bot_backend) {
         break;
     }
     case 'webui':
-        botModel = new WebUIBot(settings.bot_model, settings.bot_model_token_limit);
+        botModel = new WebUIBot(settings.bot_backend.model, settings.bot_backend.token_limit);
         break;
     default: {
-        if (!fs.existsSync(settings.bot_model)) {
-            throw new Error(`${settings.bot_model} does not exist, please check settings.json.`);
+        if (!fs.existsSync(settings.bot_backend.model)) {
+            throw new Error(
+                `${settings.bot_backend.model} does not exist, please check settings.json.`
+            );
         }
-        const llamaBot = new LlamaBot(settings.bot_model, settings.bot_model_token_limit);
+        const llamaBot = new LlamaBot(settings.bot_backend.model, settings.bot_backend.token_limit);
         await llamaBot.init();
         botModel = llamaBot;
         break;
     }
 }
-switch (settings.embedding_backend) {
+switch (settings.embedding_backend.name) {
     case 'openai': {
         tokenModel = botModel as OpenAIBot;
         embeddingModel = botModel as OpenAIBot;
         break;
     }
     case 'llama': {
-        if (!fs.existsSync(settings.embedding_model)) {
+        if (!fs.existsSync(settings.embedding_backend.model)) {
             throw new Error(
-                `${settings.embedding_model} does not exist, please check settings.json.`
+                `${settings.embedding_backend.model} does not exist, please check settings.json.`
             );
         }
         const llamaEmbedding = new LlamaEmbedding(
-            settings.embedding_model,
-            settings.bot_model_token_limit
+            settings.embedding_backend.model,
+            settings.bot_backend.token_limit
         );
         await llamaEmbedding.init();
         tokenModel = llamaEmbedding;
@@ -124,7 +126,10 @@ switch (settings.embedding_backend) {
         break;
     }
     default: {
-        const sbert = new SbertEmbedding(settings.embedding_model, settings.bot_model_token_limit);
+        const sbert = new SbertEmbedding(
+            settings.embedding_backend.model,
+            settings.bot_backend.token_limit
+        );
         tokenModel = sbert;
         embeddingModel = sbert;
         break;
@@ -133,10 +138,10 @@ switch (settings.embedding_backend) {
 
 // Create the memory model
 let memory: MemoryProvider | undefined;
-if (settings.memory_provider === 'redis') {
+if (settings.memory_backend.name === 'redis') {
     const redisMemory = new RedisMemory(
-        settings.redis_host,
-        settings.redis_port,
+        settings.memory_backend.redis_host,
+        settings.memory_backend.redis_port,
         embeddingModel,
         `idx:${settings.bot_name}:memory`
     );

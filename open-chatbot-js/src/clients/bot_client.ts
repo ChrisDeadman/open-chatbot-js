@@ -92,7 +92,7 @@ export abstract class BotClient {
 
     protected parseResponse(response: string, botName: string): any {
         // Strip the bot name
-        response = response.replaceAll(new RegExp(`^\\s*${botName}:\\s*`, 'g'), '');
+        response = response.replaceAll(new RegExp(`^\\s*${botName}:\\s*`, 'gm'), '');
 
         // Strip excess newlines
         response = response

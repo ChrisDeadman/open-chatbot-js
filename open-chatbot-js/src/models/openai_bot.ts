@@ -25,32 +25,32 @@ export class OpenAIBot implements BotModel, TokenModel, EmbeddingModel {
     private chatQueueEvents: QueueEvents;
     private worker: Worker;
 
-    constructor(queueName: string, openai_api_key: string, model: string, maxTokens: number) {
+    constructor(queueName: string, apiKey: string, model: string, maxTokens: number) {
         this.maxTokens = maxTokens;
-        this.openai = new OpenAIApi(new Configuration({ apiKey: openai_api_key }));
+        this.openai = new OpenAIApi(new Configuration({ apiKey: apiKey }));
         this.model = model;
 
         this.chatQueue = new Queue<JobData, any>(`queue:${queueName}:jobs`, {
             connection: {
-                host: settings.redis_host,
-                port: settings.redis_port,
+                host: settings.memory_backend.redis_host,
+                port: settings.memory_backend.redis_port,
             },
         });
         this.chatQueue.obliterate({ force: true }); // remove old jobs
         this.chatQueueEvents = new QueueEvents(this.chatQueue.name, {
             connection: {
-                host: settings.redis_host,
-                port: settings.redis_port,
+                host: settings.memory_backend.redis_host,
+                port: settings.memory_backend.redis_port,
             },
         });
         this.worker = new Worker(this.chatQueue.name, this.processChatJob.bind(this), {
             connection: {
-                host: settings.redis_host,
-                port: settings.redis_port,
+                host: settings.memory_backend.redis_host,
+                port: settings.memory_backend.redis_port,
             },
             limiter: {
                 max: 1,
-                duration: settings.bot_model_rate_limit_ms,
+                duration: settings.bot_backend.rate_limit_ms,
             },
         });
     }
@@ -113,14 +113,14 @@ export class OpenAIBot implements BotModel, TokenModel, EmbeddingModel {
             const endTime = Date.now();
             const elapsedMs = endTime - startTime;
             console.debug(`OpenAI: response took ${elapsedMs}ms`);
-            this.worker.rateLimit(settings.bot_model_rate_limit_ms);
+            this.worker.rateLimit(settings.bot_backend.rate_limit_ms);
         } catch (error) {
             console.error(`OpenAI: ${error}`);
             if (axios.isAxiosError(error)) {
                 // Obey OpenAI rate limit or retry on timeout
                 const status = error.response?.status;
                 if (status === undefined || status === 429) {
-                    this.worker.rateLimit(settings.bot_model_rate_limit_ms);
+                    this.worker.rateLimit(settings.bot_backend.rate_limit_ms);
                     throw Worker.RateLimitError();
                 }
             }
@@ -145,7 +145,7 @@ export class OpenAIBot implements BotModel, TokenModel, EmbeddingModel {
     private async _createEmbedding(messages: ConvMessage[]): Promise<number[]> {
         const result = await this.openai.createEmbedding({
             input: messages.map(m => m.content),
-            model: settings.embedding_model,
+            model: settings.embedding_backend.model,
         });
         return result.data.data[0].embedding;
     }

@@ -5,7 +5,6 @@ import { settings } from '../settings.js';
 import { PromptTemplate } from 'langchain/prompts';
 import { BotModel } from '../models/bot_model.js';
 import { TokenModel } from '../models/token_model.js';
-import { ConvMessage } from '../utils/conv_message.js';
 import { Conversation } from '../utils/conversation.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
 
@@ -68,7 +67,7 @@ export class BotBrowser {
         });
 
         // Calculate size of page chunks
-        const chunkSize = settings.bot_model_token_limit - promptTemplate.template.length - 512;
+        const chunkSize = settings.bot_backend.token_limit - promptTemplate.template.length - 512;
 
         // Always use HTTP for proxys, HTTPS for everything else
         const proto_url = pageData.url

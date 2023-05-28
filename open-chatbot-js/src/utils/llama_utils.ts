@@ -8,16 +8,9 @@ export function buildStoppingStrings(messages: ConvMessage[]): string[] {
     );
     return [
         ...new Set(
-            [
-                '<START>',
-                '</START>',
-                '<END>',
-                '</END>',
-                '<USER>',
-                '</USER>',
-                '\nUSER:',
-                '\n### ',
-            ].concat(senders.map(s => `\n${s}:`))
+            ['<START>', '</START>', '<END>', '</END>', '<USER>', '</USER>', '\n### '].concat(
+                senders.map(s => `\n${s}:`)
+            )
         ),
     ];
 }
@@ -31,7 +24,7 @@ export function filterResponse(response: string, stoppingStrings: string[]): str
         'gi'
     );
     const removeTrailingStop = new RegExp(
-        `(###)*\\s*(<|>|</s>|${stoppingStrings
+        `(###)*\\s*(</s>|${stoppingStrings
             .map(s => s.replaceAll('\n', ''))
             .map(s => s.slice(0, s.length - 1))
             .join('|')})+[:]*\\s*$`,

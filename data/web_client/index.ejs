@@ -25,12 +25,51 @@
                     <input type="text" id="username" class="form-control py-2" value="<%= username %>" />
                   </div>
                   <div class="form-group">
-                    <label for="botname" class="py-2">Bot Name:</label>
-                    <input type="text" id="botname" class="form-control py-2" value="<%= settings.bot_name %>" />
+                    <label for="bot_name" class="py-2">Bot Name:</label>
+                    <input type="text" id="bot_name" class="form-control py-2" value="<%= settings.bot_name %>" />
                   </div>
                   <div class="form-group">
                     <label for="language" class="py-2">Language:</label>
                     <input type="text" id="language" class="form-control py-2" value="<%= settings.language %>" />
+                  </div>
+                  <div class="flex flex-column border rounded p-3 my-3">
+                    <div class="form-group">
+                      <label for="bot_backend.rate_limit_ms" class="py-2">rate_limit_ms:</label>
+                      <input type="number" id="bot_backend.rate_limit_ms" class="form-control py-2" value="<%= settings.bot_backend.rate_limit_ms %>" />
+                    </div>
+                    <div class="form-group d-flex align-items-center">
+                      <label for="bot_backend.temperature" class="py-2">temperature:</label>
+                      <input type="range" class="form-control-range flex-grow-1 m-2" id="bot_backend.temperature" min="0.01" max="1.99" step="0.01" value="<%= settings.bot_backend.temperature %>" data-display="bot_backend.temperature_display" />
+                      <input type="text" readonly class="form-control py-2" style="width: 60px;" id="bot_backend.temperature_display" value="<%= settings.bot_backend.temperature %>" />
+                    </div>
+                    <div class="form-group d-flex align-items-center">
+                      <label for="bot_backend.top_p" class="py-2">top_p:</label>
+                      <input type="range" class="form-control-range flex-grow-1 m-2" id="bot_backend.top_p" min="0.0" max="1.0" step="0.01" value="<%= settings.bot_backend.top_p %>" data-display="bot_backend.top_p_display" />
+                      <input type="text" readonly class="form-control py-2" style="width: 60px;" id="bot_backend.top_p_display" value="<%= settings.bot_backend.top_p %>" />
+                    </div>
+                    <div class="form-group d-flex align-items-center">
+                      <label for="bot_backend.top_k" class="py-2">top_k:</label>
+                      <input type="range" class="form-control-range flex-grow-1 m-2" id="bot_backend.top_k" min="0" max="200" step="1" value="<%= settings.bot_backend.top_k %>" data-display="bot_backend.top_k_display" />
+                      <input type="text" readonly class="form-control py-2" style="width: 60px;" id="bot_backend.top_k_display" value="<%= settings.bot_backend.top_k %>" />
+                    </div>
+                    <div class="form-group d-flex align-items-center">
+                      <label for="bot_backend.typical_p" class="py-2">typical_p:</label>
+                      <input type="range" class="form-control-range flex-grow-1 m-2" id="bot_backend.typical_p" min="0.0" max="1.0" step="0.01" value="<%= settings.bot_backend.typical_p %>" data-display="bot_backend.typical_p_display" />
+                      <input type="text" readonly class="form-control py-2" style="width: 60px;" id="bot_backend.typical_p_display" value="<%= settings.bot_backend.typical_p %>" />
+                    </div>
+                    <div class="form-group d-flex align-items-center">
+                      <label for="bot_backend.repetition_penalty" class="py-2">repetition_penalty:</label>
+                      <input type="range" class="form-control-range flex-grow-1 m-2" id="bot_backend.repetition_penalty" min="0.0" max="1.5" step="0.01" value="<%= settings.bot_backend.repetition_penalty %>" data-display="bot_backend.repetition_penalty_display" />
+                      <input type="text" readonly class="form-control py-2" style="width: 60px;" id="bot_backend.repetition_penalty_display" value="<%= settings.bot_backend.repetition_penalty %>" />
+                    </div>
+                    <div class="form-group">
+                      <label for="bot_backend.max_new_tokens" class="py-2">max_new_tokens:</label>
+                      <input type="number" id="bot_backend.max_new_tokens" class="form-control py-2" value="<%= settings.bot_backend.max_new_tokens %>" />
+                    </div>
+                    <div class="form-group">
+                      <label for="bot_backend.token_limit" class="py-2">token_limit:</label>
+                      <input type="number" id="bot_backend.token_limit" class="form-control py-2" value="<%= settings.bot_backend.token_limit %>" />
+                    </div>
                   </div>
                   <div class="modal-footer">
                     <button type="submit" class="btn btn-primary" data-bs-dismiss="modal">Save</button>
@@ -48,36 +87,36 @@
                 </div>
                 <form id="promptForm" class="modal-body">
                   <div class="form-group">
-                    <label for="systemMessage" class="py-2">System Message:</label>
-                    <textarea id="systemMessage" class="form-control py-2" rows="1"><%= settings.prompt_templates.system_message %></textarea>
+                    <label for="prompt_templates.system_message" class="py-2">System Message:</label>
+                    <input type="text" id="prompt_templates.system_message" class="form-control py-2" value="<%= settings.prompt_templates.system_message %>" />
                   </div>
                   <div class="form-group">
-                    <label for="userMessage" class="py-2">User Message:</label>
-                    <textarea id="userMessage" class="form-control py-2" rows="1"><%= settings.prompt_templates.user_message %></textarea>
+                    <label for="prompt_templates.user_message" class="py-2">User Message:</label>
+                    <input type="text" id="prompt_templates.user_message" class="form-control py-2" value="<%= settings.prompt_templates.user_message %>" />
                   </div>
                   <div class="form-group">
-                    <label for="assistantMessage" class="py-2">Assistant Message:</label>
-                    <textarea id="assistantMessage" class="form-control py-2" rows="1"><%= settings.prompt_templates.assistant_message %></textarea>
+                    <label for="prompt_templates.assistant_message" class="py-2">Assistant Message:</label>
+                    <input type="text" id="prompt_templates.assistant_message" class="form-control py-2" value="<%= settings.prompt_templates.assistant_message %>" />
                   </div>
                   <div class="form-group">
-                    <label for="suffix" class="py-2">Suffix:</label>
-                    <textarea id="suffix" class="form-control py-2" rows="1"><%= settings.prompt_templates.suffix.join("\n") %></textarea>
+                    <label for="prompt_templates.suffix" class="py-2">Suffix:</label>
+                    <textarea id="prompt_templates.suffix" class="form-control py-2" rows="1"><%= settings.prompt_templates.suffix.join("\n") %></textarea>
                   </div>
                   <div class="form-group">
-                    <label for="prefix" class="py-2">Prefix:</label>
-                    <textarea id="prefix" class="form-control py-2" rows="15"><%= settings.prompt_templates.prefix.join('\n') %></textarea>
+                    <label for="prompt_templates.prefix" class="py-2">Prefix:</label>
+                    <textarea id="prompt_templates.prefix" class="form-control py-2" rows="15"><%= settings.prompt_templates.prefix.join('\n') %></textarea>
                   </div>
                   <div class="form-group">
-                    <label for="history" class="py-2">History:</label>
-                    <textarea id="history" class="form-control py-2" rows="15"><%= settings.prompt_templates.history.join('\n') %></textarea>
+                    <label for="prompt_templates.history" class="py-2">History:</label>
+                    <textarea id="prompt_templates.history" class="form-control py-2" rows="15"><%= settings.prompt_templates.history.join('\n') %></textarea>
                   </div>
                   <div class="form-group">
-                    <label for="tools" class="py-2">Tools:</label>
-                    <textarea id="tools" class="form-control py-2" rows="15"><%= settings.prompt_templates.tools.join('\n') %></textarea>
+                    <label for="prompt_templates.tools" class="py-2">Tools:</label>
+                    <textarea id="prompt_templates.tools" class="form-control py-2" rows="15"><%= settings.prompt_templates.tools.join('\n') %></textarea>
                   </div>
                   <div class="form-group">
-                    <label for="botBrowserPrompt" class="py-2">Bot-Browser Prompt:</label>
-                    <textarea id="botBrowserPrompt" class="form-control py-2" rows="10"><%= settings.prompt_templates.bot_browser.join('\n') %></textarea>
+                    <label for="prompt_templates.bot_browser" class="py-2">Bot-Browser Prompt:</label>
+                    <textarea id="prompt_templates.bot_browser" class="form-control py-2" rows="10"><%= settings.prompt_templates.bot_browser.join('\n') %></textarea>
                   </div>
                   <div class="modal-footer">
                     <button type="submit" class="btn btn-primary" data-bs-dismiss="modal">Save</button>
