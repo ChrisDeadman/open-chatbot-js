@@ -59,7 +59,7 @@ export abstract class BotClient {
                                     new ConvMessage(
                                         'system',
                                         'system',
-                                        result.slice(0, this.tokenModel.maxTokens / 2) // limit text
+                                        result.slice(0, this.tokenModel.maxTokens) // limit text
                                     )
                                 );
                             }
@@ -91,8 +91,8 @@ export abstract class BotClient {
     }
 
     protected parseResponse(response: string, botName: string): any {
-        // Strip end-of-previous-sentence and the bot name
-        response = response.replace(new RegExp(`\\p{P}*\\n*\\s*${botName}:\\s*`, 'u'), '');
+        // Strip the bot name
+        response = response.replaceAll(new RegExp(`^\\s*${botName}:\\s*`, 'g'), '');
 
         // Strip excess newlines
         response = response
