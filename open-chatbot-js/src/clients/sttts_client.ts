@@ -68,12 +68,8 @@ export class STTTSClient extends BotClient {
             }
         }
         if (chat) {
-            try {
-                await this.chat(conversation);
-                this.lastMessageTime = Date.now();
-            } catch (error) {
-                console.error(error);
-            }
+            // do not await here otherwise chats will pile up!
+            this.chat(conversation).catch(error => console.error(error));
         }
     }
 

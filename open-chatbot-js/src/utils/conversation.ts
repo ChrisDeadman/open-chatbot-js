@@ -92,7 +92,7 @@ export class Conversation extends EventEmitter {
         }
 
         // Find the index of the markMessage in the array
-        const markIndex = messagesArray.findIndex(msg =>
+        const markIndex = messagesArray.findLastIndex(msg =>
             this.markMessage ? msg.equals(this.markMessage) : false
         );
 

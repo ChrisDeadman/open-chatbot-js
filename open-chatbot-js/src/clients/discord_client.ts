@@ -298,11 +298,8 @@ export class DiscordClient extends BotClient {
         }
         if (chat) {
             this.startTyping(conversation);
-            try {
-                await this.chat(conversation);
-            } catch (error) {
-                console.error(error);
-            }
+             // do not await here otherwise chats will pile up!
+            this.chat(conversation).catch(error => console.error(error));
         }
     }
 

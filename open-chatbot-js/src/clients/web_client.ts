@@ -119,12 +119,9 @@ export class WebClient extends BotClient {
             }
         }
         if (chat) {
-            try {
-                this.io.emit('typing', `${conversation.settings.bot_name} is typing...`);
-                await this.chat(conversation);
-            } catch (error) {
-                console.error(error);
-            }
+            this.io.emit('typing', `${conversation.settings.bot_name} is typing...`);
+            // do not await here otherwise chats will pile up!
+            this.chat(conversation).catch(error => console.error(error));
         }
     }
 }
