@@ -16,6 +16,7 @@ export class Conversation extends EventEmitter {
     private memory: MemoryProvider | undefined;
     private delayTimeout: NodeJS.Timeout | undefined;
     private markMessage: ConvMessage | undefined;
+    private fixedPrompt: string | undefined;
     private updating = false;
 
     settings: any;
@@ -27,12 +28,14 @@ export class Conversation extends EventEmitter {
         settings: any,
         tokenModel: TokenModel,
         memory: MemoryProvider | undefined = undefined,
-        context: any = undefined
+        context: any = undefined,
+        fixedPrompt: string | undefined = undefined
     ) {
         super();
-        this.settings = settings;
         this.tokenModel = tokenModel;
         this.memory = memory;
+        this.fixedPrompt = fixedPrompt;
+        this.settings = settings;
         this.context = context;
         this.memoryContext = '';
         this.messages = new CyclicBuffer(this.settings.message_history_size);
@@ -116,30 +119,38 @@ export class Conversation extends EventEmitter {
         });
 
         // parse prefix
-        const prefixTemplate = new PromptTemplate({
-            inputVariables: [...Object.keys(this.settings), 'tools', 'now'],
-            template: this.settings.prompt_templates.prefix.join('\n'),
-        });
-        const prefix = await prefixTemplate.format({
-            ...this.settings,
-            tools: tools,
-            now: dateTimeToStr(new Date(), this.settings.locale),
-        });
+        if (this.fixedPrompt === undefined) {
+            const prefixTemplate = new PromptTemplate({
+                inputVariables: [...Object.keys(this.settings), 'tools', 'now'],
+                template: this.settings.prompt_templates.prefix.join('\n'),
+            });
+            const prefix = await prefixTemplate.format({
+                ...this.settings,
+                tools: tools,
+                now: dateTimeToStr(new Date(), this.settings.locale),
+            });
 
-        // parse history
-        const historyTemplate = new PromptTemplate({
-            inputVariables: [...Object.keys(this.settings), 'now'],
-            template: this.settings.prompt_templates.history.join('\n'),
-        });
-        const history = await historyTemplate.format({
-            ...this.settings,
-            now: dateTimeToStr(new Date(), this.settings.locale),
-        });
+            // parse history
+            const historyTemplate = new PromptTemplate({
+                inputVariables: [...Object.keys(this.settings), 'now'],
+                template: this.settings.prompt_templates.history.join('\n'),
+            });
+            const history = await historyTemplate.format({
+                ...this.settings,
+                now: dateTimeToStr(new Date(), this.settings.locale),
+            });
 
-        // combine and add them to the memories
-        const combined = `${prefix}\n${history}`;
-        if (combined.length >= 0) {
-            await this.appendMessages(messages, [new ConvMessage('system', 'system', combined)]);
+            // combine and add them to the memories
+            const combined = `${prefix}\n${history}`;
+            if (combined.length >= 0) {
+                await this.appendMessages(messages, [
+                    new ConvMessage('system', 'system', combined),
+                ]);
+            }
+        } else {
+            await this.appendMessages(messages, [
+                new ConvMessage('system', 'system', this.fixedPrompt),
+            ]);
         }
 
         if (this.memory && this.memoryContext.length >= 0) {

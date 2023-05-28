@@ -50,12 +50,12 @@ export class WebClient extends BotClient {
         });
 
         this.io.on('connection', socket => {
-            socket.on('chat message', async messsage => {
+            socket.on('chat message', async (sender, messsage) => {
                 try {
                     messsage = messsage.trimStart();
                     if (messsage.length > 0) {
                         // Add new message to conversation
-                        this.conversation.push(new ConvMessage('user', this.username, messsage));
+                        this.conversation.push(new ConvMessage('user', sender, messsage));
                     }
                 } catch (error) {
                     console.error(error);
@@ -101,7 +101,7 @@ export class WebClient extends BotClient {
             switch (message.role) {
                 case 'user': {
                     if (message.sender != this.username) {
-                        this.io.emit('chat message', `${message.sender}: ${message.content}`);
+                        this.io.emit('chat message', message.sender, message.content);
                     }
                     chat = true;
                     break;
@@ -111,10 +111,10 @@ export class WebClient extends BotClient {
                         'stop typing',
                         `${conversation.settings.bot_name} stopped typing.`
                     );
-                    this.io.emit('chat message', `${message.sender}: ${message.content}`);
+                    this.io.emit('chat message', message.sender, message.content);
                     break;
                 case 'system':
-                    this.io.emit('chat message', message.content);
+                    this.io.emit('chat message', message.sender, message.content);
                     break;
             }
         }

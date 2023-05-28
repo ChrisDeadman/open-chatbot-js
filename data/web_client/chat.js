@@ -77,7 +77,11 @@ messageForm.addEventListener("submit", function (e) {
     );
     messages.scrollTop = messages.scrollHeight;
 
-    socket.emit("chat message", userInput.innerText);
+    socket.emit(
+      "chat message",
+      document.getElementById("username").value,
+      userInput.innerText
+    );
     userInput.innerText = "";
   }
 });
@@ -89,23 +93,19 @@ userInput.addEventListener("keydown", function (e) {
   }
 });
 
-socket.on("chat message", function (message) {
-  // remove the botname from the start
+socket.on("chat message", function (sender, message) {
   const botname = document.getElementById("botname").value;
-  const senderMatch = message.match(new RegExp(`^\\s*([\\w\\s]+)\\s*:\\s*`));
   var iconClass;
-  var sender;
-  if (senderMatch) {
-    message = message.replace(senderMatch[0], "");
-    sender = senderMatch[1];
-    if (sender === botname) {
+  switch (sender) {
+    case botname:
       iconClass = "fa-robot";
-    } else {
+      break;
+    case "system":
+      iconClass = "fa-wrench";
+      break;
+    default:
       iconClass = "fa-user-secret";
-    }
-  } else {
-    sender = "system";
-    iconClass = "fa-wrench";
+      break;
   }
   const bgStyle =
     messages.children.length % 2 == 0 ? "bg-secondary" : "bg-primary";

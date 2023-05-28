@@ -158,8 +158,13 @@ export class BotBrowser {
                 });
 
                 // generate updated summary
-                const conversation = new Conversation(settings, this.tokenModel);
-                conversation.push(new ConvMessage('system', 'system', prompt));
+                const conversation = new Conversation(
+                    settings,
+                    this.tokenModel,
+                    undefined,
+                    undefined,
+                    prompt
+                );
                 pageData.summary = await this.botModel.chat(conversation);
             }
 
