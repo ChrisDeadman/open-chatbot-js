@@ -1,12 +1,9 @@
 import { Browser, Page } from 'puppeteer';
 
-import { settings } from '../settings.js';
-
 import { PromptTemplate } from 'langchain/prompts';
-import { BotModel } from '../models/bot_model.js';
-import { TokenModel } from '../models/token_model.js';
 import { Conversation } from '../utils/conversation.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
+import { BotController } from '../utils/bot_controller.js';
 
 class PageData {
     url: string;
@@ -26,14 +23,12 @@ class PageData {
 }
 
 export class BotBrowser {
-    private botModel: BotModel;
-    private tokenModel: TokenModel;
+    private botController: BotController;
     private browser: Browser;
     private pages: { [key: string]: { [key: string]: PageData } } = {};
 
-    constructor(botModel: BotModel, tokenModel: TokenModel, browser: Browser) {
-        this.botModel = botModel;
-        this.tokenModel = tokenModel;
+    constructor(botController: BotController, browser: Browser) {
+        this.botController = botController;
         this.browser = browser;
     }
 
@@ -62,19 +57,31 @@ export class BotBrowser {
     private async readPage(pageData: PageData, question: string, language: string) {
         // Prepare bot model prompt template
         const promptTemplate = new PromptTemplate({
-            inputVariables: [...Object.keys(settings), 'question', 'summary', 'content', 'now'],
-            template: settings.prompt_templates.bot_browser.join('\n'),
+            inputVariables: [
+                ...Object.keys(this.botController.settings),
+                'question',
+                'summary',
+                'content',
+                'now',
+            ],
+            template: this.botController.settings.prompt_templates.bot_browser.join('\n'),
         });
 
         // Calculate size of page chunks
-        const chunkSize = settings.bot_backend.token_limit - promptTemplate.template.length - 512;
+        const chunkSize =
+            this.botController.settings.bot_backend.token_limit -
+            promptTemplate.template.length -
+            512;
 
         // Always use HTTP for proxys, HTTPS for everything else
         const proto_url = pageData.url
             .replace('http://', '')
             .replace('https://', '')
             .replace('file:///', '');
-        const url = settings.proxy_host != null ? `http://${proto_url}` : `https://${proto_url}`;
+        const url =
+            this.botController.settings.proxy_host != null
+                ? `http://${proto_url}`
+                : `https://${proto_url}`;
 
         try {
             // Loading the page and get the content
@@ -98,7 +105,7 @@ export class BotBrowser {
 
                 // Load page content
                 await page.goto(url, {
-                    timeout: settings.browser_timeout,
+                    timeout: this.botController.settings.browser_timeout,
                     waitUntil: 'domcontentloaded',
                 });
 
@@ -148,23 +155,17 @@ export class BotBrowser {
 
                 // format bot model prompt
                 const prompt = await promptTemplate.format({
-                    ...settings,
+                    ...this.botController.settings,
                     question: question,
                     summary: pageData.summary,
                     content: pageData.content.shift(),
                     language: language,
-                    now: dateTimeToStr(new Date(), settings.locale),
+                    now: dateTimeToStr(new Date(), this.botController.settings.locale),
                 });
 
                 // generate updated summary
-                const conversation = new Conversation(
-                    settings,
-                    this.tokenModel,
-                    undefined,
-                    undefined,
-                    prompt
-                );
-                pageData.summary = await this.botModel.chat(conversation);
+                const conversation = new Conversation(this.botController, undefined, prompt);
+                pageData.summary = await this.botController.botModel.chat(conversation);
             }
 
             // Update status

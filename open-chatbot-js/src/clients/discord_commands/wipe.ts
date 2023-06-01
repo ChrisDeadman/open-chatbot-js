@@ -6,7 +6,7 @@ export const data = new SlashCommandBuilder()
     .setDescription('Wipe the bots memory');
 
 export async function execute(client: DiscordClient, interaction: any) {
-    if (client.memory) await client.memory.clear();
+    if (client.botController.memory) await client.botController.memory.clear();
     const response = 'My memory is wiped.';
     console.log(`[${interaction.channelId}] ${response}`);
     await interaction.reply(response);

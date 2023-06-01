@@ -17,7 +17,7 @@
     "redis_port": 6379
   },
   "message_history_size": 50,
-  "chat_process_delay_ms": 2000,
+  "chat_process_delay_ms": 3500,
   "bot_name": "Eva",
   "locale": "en-US",
   "language": "English",

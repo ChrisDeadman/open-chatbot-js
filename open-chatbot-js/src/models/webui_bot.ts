@@ -34,16 +34,16 @@ export class WebUIBot implements BotModel {
                     skip_special_tokens: true,
                     ban_eos_token: false,
                     do_sample: true,
-                    temperature: conversation.settings.bot_backend.temperature,
-                    top_p: conversation.settings.bot_backend.top_p,
-                    top_k: conversation.settings.bot_backend.top_k,
-                    typical_p: conversation.settings.bot_backend.typical_p,
-                    repetition_penalty: conversation.settings.bot_backend.repetition_penalty,
-                    max_new_tokens: conversation.settings.bot_backend.max_new_tokens,
+                    temperature: conversation.botController.settings.bot_backend.temperature,
+                    top_p: conversation.botController.settings.bot_backend.top_p,
+                    top_k: conversation.botController.settings.bot_backend.top_k,
+                    typical_p: conversation.botController.settings.bot_backend.typical_p,
+                    repetition_penalty: conversation.botController.settings.bot_backend.repetition_penalty,
+                    max_new_tokens: conversation.botController.settings.bot_backend.max_new_tokens,
                     truncation_length: this.maxTokens,
                 },
                 {
-                    timeout: conversation.settings.browser_timeout,
+                    timeout: conversation.botController.settings.browser_timeout,
                 }
             );
             const response = String(completion.data.results[0].text);

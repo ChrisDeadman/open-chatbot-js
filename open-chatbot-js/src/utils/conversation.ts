@@ -1,8 +1,7 @@
 import { EventEmitter } from 'events';
 import { PromptTemplate } from 'langchain/prompts';
-import { MemoryProvider } from '../memory/memory_provider.js';
-import { TokenModel } from '../models/token_model.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
+import { BotController } from './bot_controller.js';
 import { ConvMessage } from './conv_message.js';
 import { CyclicBuffer } from './cyclic_buffer.js';
 
@@ -12,43 +11,39 @@ export enum ConversationEvents {
 }
 
 export class Conversation extends EventEmitter {
-    private tokenModel: TokenModel;
-    private memory: MemoryProvider | undefined;
     private delayTimeout: NodeJS.Timeout | undefined;
-    private markMessage: ConvMessage | undefined;
     private fixedPrompt: string | undefined;
     private updating = false;
 
-    settings: any;
+    botController: BotController;
     context: any;
     memoryContext: string;
-    messages: CyclicBuffer<ConvMessage>;
+    private messageBuffer: CyclicBuffer<ConvMessage>;
 
     constructor(
-        settings: any,
-        tokenModel: TokenModel,
-        memory: MemoryProvider | undefined = undefined,
+        botController: BotController,
         context: any = undefined,
         fixedPrompt: string | undefined = undefined
     ) {
         super();
-        this.tokenModel = tokenModel;
-        this.memory = memory;
+        this.botController = botController;
         this.fixedPrompt = fixedPrompt;
-        this.settings = settings;
         this.context = context;
         this.memoryContext = '';
-        this.messages = new CyclicBuffer(this.settings.message_history_size);
+        this.messageBuffer = new CyclicBuffer(this.botController.settings.message_history_size);
     }
 
     clear() {
-        this.messages.clear();
+        this.messageBuffer.clear();
         this.memoryContext = '';
         this.emit(ConversationEvents.Cleared, this);
     }
 
     push(...messages: ConvMessage[]) {
-        this.messages.push(...messages);
+        if (messages.length <= 0) {
+            return;
+        }
+        this.messageBuffer.push(...messages);
 
         if (this.delayTimeout) {
             clearTimeout(this.delayTimeout);
@@ -75,34 +70,42 @@ export class Conversation extends EventEmitter {
             }
         };
 
-        this.delayTimeout = setTimeout(timeoutFunc, this.settings.chat_process_delay_ms);
+        this.delayTimeout = setTimeout(
+            timeoutFunc,
+            this.botController.settings.chat_process_delay_ms
+        );
     }
 
-    mark() {
-        this.markMessage = [...this.messages].at(-1);
+    get messages(): ConvMessage[] {
+        return [...this.messageBuffer];
     }
 
-    getMessagesFromMark(): ConvMessage[] {
+    getMessagesFromMark(mark: ConvMessage | undefined): ConvMessage[] | undefined {
         // Copy the CyclicBuffer messages to a standard array
-        const messagesArray = [...this.messages];
+        const messagesArray = [...this.messageBuffer];
 
         // If markMessage is undefined, return all messages
-        if (!this.markMessage) {
+        if (!mark) {
             return messagesArray;
         }
 
         // Find the index of the markMessage in the array
-        const markIndex = messagesArray.findLastIndex(msg =>
-            this.markMessage ? msg.equals(this.markMessage) : false
-        );
+        const markIndex = messagesArray.findLastIndex(msg => msg.equals(mark));
 
-        // If the markMessage wasn't found, return all messages
+        // Return undefined if the markMessage wasn't found
         if (markIndex < 0) {
-            return messagesArray;
+            return undefined;
         }
 
         // Return the slice of the array starting from the message after the mark
         return messagesArray.slice(markIndex + 1);
+    }
+
+    mark(idx?: number): ConvMessage | undefined {
+        if (idx == null) {
+            idx = -1;
+        }
+        return [...this.messageBuffer].at(idx);
     }
 
     async getPrompt(): Promise<ConvMessage[]> {
@@ -110,34 +113,34 @@ export class Conversation extends EventEmitter {
 
         // parse tools
         const toolsTemplate = new PromptTemplate({
-            inputVariables: [...Object.keys(this.settings), 'now'],
-            template: this.settings.prompt_templates.tools.join('\n'),
+            inputVariables: [...Object.keys(this.botController.settings), 'now'],
+            template: this.botController.settings.prompt_templates.tools.join('\n'),
         });
         const tools = await toolsTemplate.format({
-            ...this.settings,
-            now: dateTimeToStr(new Date(), this.settings.locale),
+            ...this.botController.settings,
+            now: dateTimeToStr(new Date(), this.botController.settings.locale),
         });
 
         // parse prefix
         if (this.fixedPrompt === undefined) {
             const prefixTemplate = new PromptTemplate({
-                inputVariables: [...Object.keys(this.settings), 'tools', 'now'],
-                template: this.settings.prompt_templates.prefix.join('\n'),
+                inputVariables: [...Object.keys(this.botController.settings), 'tools', 'now'],
+                template: this.botController.settings.prompt_templates.prefix.join('\n'),
             });
             const prefix = await prefixTemplate.format({
-                ...this.settings,
+                ...this.botController.settings,
                 tools: tools,
-                now: dateTimeToStr(new Date(), this.settings.locale),
+                now: dateTimeToStr(new Date(), this.botController.settings.locale),
             });
 
             // parse history
             const historyTemplate = new PromptTemplate({
-                inputVariables: [...Object.keys(this.settings), 'now'],
-                template: this.settings.prompt_templates.history.join('\n'),
+                inputVariables: [...Object.keys(this.botController.settings), 'now'],
+                template: this.botController.settings.prompt_templates.history.join('\n'),
             });
             const history = await historyTemplate.format({
-                ...this.settings,
-                now: dateTimeToStr(new Date(), this.settings.locale),
+                ...this.botController.settings,
+                now: dateTimeToStr(new Date(), this.botController.settings.locale),
             });
 
             // combine and add them to the memories
@@ -153,18 +156,23 @@ export class Conversation extends EventEmitter {
             ]);
         }
 
-        if (this.memory && this.memoryContext.length >= 0) {
+        if (this.botController.memory && this.memoryContext.length >= 0) {
             // get memories related to the memory vector
-            const memories = (await this.memory.get(this.memoryContext, 10)).map(
+            const memories = (await this.botController.memory.get(this.memoryContext, 10)).map(
                 m => new ConvMessage('system', 'memory', m)
             );
 
             // add limited amount of memories
-            await this.appendMessages(messages, memories, true, this.tokenModel.maxTokens / 2);
+            await this.appendMessages(
+                messages,
+                memories,
+                true,
+                this.botController.tokenModel.maxTokens / 2
+            );
         }
 
         // add most recent messages, save some tokens for the response
-        await this.appendMessages(messages, [...this.messages], true, -512);
+        await this.appendMessages(messages, [...this.messageBuffer], true, -512);
 
         return messages;
     }
@@ -174,19 +182,19 @@ export class Conversation extends EventEmitter {
 
         const systemTemplate = new PromptTemplate({
             inputVariables: ['role', 'sender', 'content'],
-            template: this.settings.prompt_templates.system_message,
+            template: this.botController.settings.prompt_templates.system_message,
         });
         const userTemplate = new PromptTemplate({
             inputVariables: ['role', 'sender', 'content'],
-            template: this.settings.prompt_templates.user_message,
+            template: this.botController.settings.prompt_templates.user_message,
         });
         const assistantTemplate = new PromptTemplate({
             inputVariables: ['role', 'sender', 'content'],
-            template: this.settings.prompt_templates.assistant_message,
+            template: this.botController.settings.prompt_templates.assistant_message,
         });
         const suffixTemplate = new PromptTemplate({
-            inputVariables: [...Object.keys(this.settings), 'now'],
-            template: this.settings.prompt_templates.suffix.join('\n'),
+            inputVariables: [...Object.keys(this.botController.settings), 'now'],
+            template: this.botController.settings.prompt_templates.suffix.join('\n'),
         });
 
         // Use prefix as is
@@ -212,8 +220,8 @@ export class Conversation extends EventEmitter {
 
         // Suffix
         const suffix = await suffixTemplate.format({
-            ...this.settings,
-            now: dateTimeToStr(new Date(), this.settings.locale),
+            ...this.botController.settings,
+            now: dateTimeToStr(new Date(), this.botController.settings.locale),
         });
         prompt.push(suffix);
 
@@ -223,11 +231,11 @@ export class Conversation extends EventEmitter {
     // Update memory vector related to conversation context
     // Called internally before every update event
     async updateMemoryContext() {
-        if (this.memory) {
+        if (this.botController.memory) {
             const memContext: ConvMessage[] = [];
             this.memoryContext = await this.appendMessages(
                 memContext,
-                [...this.messages].slice(1),
+                [...this.messageBuffer].slice(1),
                 false
             );
         }
@@ -242,9 +250,9 @@ export class Conversation extends EventEmitter {
         const limit =
             tokenLimit != null
                 ? tokenLimit >= 0
-                    ? Math.min(tokenLimit, this.tokenModel.maxTokens)
-                    : this.tokenModel.maxTokens + tokenLimit
-                : this.tokenModel.maxTokens;
+                    ? Math.min(tokenLimit, this.botController.tokenModel.maxTokens)
+                    : this.botController.tokenModel.maxTokens + tokenLimit
+                : this.botController.tokenModel.maxTokens;
         if (limit <= 0) {
             return await this.getPromptString(target, includesPrefix);
         }
@@ -253,7 +261,7 @@ export class Conversation extends EventEmitter {
         while (truncated.length > 0) {
             // as long as there are enough tokens remaining for the response
             const prompt = await this.getPromptString([...target, ...truncated], includesPrefix);
-            const tokens = await this.tokenModel.tokenize(prompt);
+            const tokens = await this.botController.tokenModel.tokenize(prompt);
             if (tokens.length <= limit) {
                 target.push(...truncated);
                 return prompt;

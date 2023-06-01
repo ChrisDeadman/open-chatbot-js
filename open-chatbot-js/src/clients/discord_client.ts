@@ -11,34 +11,26 @@ import { fileURLToPath } from 'node:url';
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v9';
 import { PromptTemplate } from 'langchain/prompts';
-import { CommandApi } from '../bot_api/command_api.js';
-import { MemoryProvider } from '../memory/memory_provider.js';
-import { BotModel } from '../models/bot_model.js';
-import { TokenModel } from '../models/token_model.js';
+import { BotController } from '../utils/bot_controller.js';
 import { ConvMessage } from '../utils/conv_message.js';
 import { Conversation, ConversationEvents } from '../utils/conversation.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { BotClient } from './bot_client.js';
 
-export class DiscordClient extends BotClient {
-    memory: MemoryProvider | undefined;
-    private settings: any;
+export class DiscordClient implements BotClient {
+    settings: any;
+    botController: BotController;
+
     private client: Client;
     private commands = new Collection<string, any>();
     private commandArray = new Array<any>();
     private conversation: { [key: Snowflake]: Conversation } = {};
+    private conversationMarks: Map<Conversation, ConvMessage | undefined> = new Map();
     private typingTimeout: NodeJS.Timeout | undefined;
 
-    constructor(
-        settings: any,
-        botModel: BotModel,
-        tokenModel: TokenModel,
-        botApiHandler: CommandApi,
-        memory: MemoryProvider | undefined = undefined
-    ) {
-        super(botModel, tokenModel, botApiHandler);
+    constructor(settings: any) {
         this.settings = settings;
-        this.memory = memory;
+        this.botController = new BotController(settings);
         this.client = new Client({
             intents: [
                 GatewayIntentBits.Guilds,
@@ -110,10 +102,11 @@ export class DiscordClient extends BotClient {
 
         this.initEventListeners();
 
+        console.log('Initializing bot...');
+        await this.botController.init();
+
         console.log('Logging in...');
         await this.client.login(this.settings.discord_bot_token);
-
-        console.log('Bot startup complete.');
     }
 
     async shutdown() {
@@ -123,17 +116,12 @@ export class DiscordClient extends BotClient {
         // Wait a bit before destroying the discord instance
         await new Promise(resolve => setTimeout(resolve, 1000));
         this.client.destroy();
-        console.log('Bot has been shut down.');
+        console.log('Client shutdown complete.');
     }
 
     getConversation(channel: Channel): Conversation {
         if (!(channel.id in this.conversation)) {
-            this.conversation[channel.id] = new Conversation(
-                this.settings,
-                this.tokenModel,
-                this.memory,
-                channel
-            );
+            this.conversation[channel.id] = new Conversation(this.botController, channel);
             this.conversation[channel.id].on(
                 ConversationEvents.Updated,
                 this.onConversationUpdated.bind(this)
@@ -164,10 +152,13 @@ export class DiscordClient extends BotClient {
                 now: dateTimeToStr(new Date(), this.settings.locale),
             });
 
-            const conversation = new Conversation(this.settings, this.tokenModel);
+            const conversation = new Conversation(this.botController);
             conversation.push(new ConvMessage('system', 'system', statusPrompt));
-            const response = await this.botModel.chat(conversation);
-            const responseData = this.parseResponse(response, conversation.settings.bot_name);
+            const response = await this.botController.botModel.chat(conversation);
+            const responseData = this.botController.parseResponse(
+                response,
+                conversation.botController.settings.bot_name
+            );
             responseData.message = responseData.message.split('.')[0];
             console.log(`Status message: ${responseData.message}`);
 
@@ -175,7 +166,7 @@ export class DiscordClient extends BotClient {
             this.client.user?.setPresence({ status: 'online' });
             this.client.user?.setActivity(responseData.message, { type: 3 });
 
-            console.log('Bot startup complete.');
+            console.log('Client startup complete.');
         });
         //
         // ERROR
@@ -280,8 +271,12 @@ export class DiscordClient extends BotClient {
 
     private async onConversationUpdated(conversation: Conversation) {
         const channel = conversation.context;
-        const messages = conversation.getMessagesFromMark();
-        conversation.mark();
+        const mark = this.conversationMarks.get(conversation);
+        const messages = conversation.getMessagesFromMark(mark) || [];
+        if (messages.length <= 0) {
+            messages.push(...conversation.messages);
+        }
+        this.conversationMarks.set(conversation, conversation.mark());
         let chat = false;
         for (const message of messages) {
             switch (message.role) {
@@ -298,8 +293,7 @@ export class DiscordClient extends BotClient {
         }
         if (chat) {
             this.startTyping(conversation);
-             // do not await here otherwise chats will pile up!
-            this.chat(conversation).catch(error => console.error(error));
+            await this.botController.chat(conversation).catch(error => console.error(error));
         }
     }
 

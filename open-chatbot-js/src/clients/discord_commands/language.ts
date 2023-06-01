@@ -14,7 +14,7 @@ export const data = new SlashCommandBuilder()
 export async function execute(client: DiscordClient, interaction: any) {
     const language = interaction.options.getString('language');
     const response = `Language changed to ${language}`;
-    client.getConversation(interaction.channel).settings.language = language;
+    client.getConversation(interaction.channel).botController.settings.language = language;
     console.log(`[${interaction.channelId}] ${response}`);
     await interaction.reply(response);
 }

@@ -1,29 +1,21 @@
 import readline from 'readline';
-import { CommandApi } from '../bot_api/command_api.js';
-import { MemoryProvider } from '../memory/memory_provider.js';
-import { BotModel } from '../models/bot_model.js';
-import { TokenModel } from '../models/token_model.js';
 import { ConvMessage } from '../utils/conv_message.js';
 import { Conversation, ConversationEvents } from '../utils/conversation.js';
 import { BotClient } from './bot_client.js';
+import { BotController } from '../utils/bot_controller.js';
 
-export class TerminalClient extends BotClient {
+export class TerminalClient implements BotClient {
     private rlInterface: any;
-    protected conversation: Conversation;
+    private conversation: Conversation;
+    private conversationMark: ConvMessage | undefined;
 
     private username;
+    private botController: BotController;
 
-    constructor(
-        settings: any,
-        botModel: BotModel,
-        tokenModel: TokenModel,
-        botApiHandler: CommandApi,
-        memory: MemoryProvider | undefined = undefined,
-        username = 'User'
-    ) {
-        super(botModel, tokenModel, botApiHandler);
+    constructor(settings: any, username = 'User') {
+        this.botController = new BotController(settings);
         this.username = username;
-        this.conversation = new Conversation(settings, tokenModel, memory);
+        this.conversation = new Conversation(this.botController);
     }
 
     async startup() {
@@ -45,19 +37,23 @@ export class TerminalClient extends BotClient {
         });
 
         this.conversation.on(ConversationEvents.Updated, this.onConversationUpdated.bind(this));
+        await this.botController.init();
 
-        console.log('Bot startup complete.');
+        console.log('Client startup complete.');
         process.stdout.write(`${this.username}> `);
     }
 
     async shutdown() {
         this.rlInterface.close();
-        console.log('Bot has been shut down.');
+        console.log('Client shutdown complete.');
     }
 
     async onConversationUpdated(conversation: Conversation) {
-        const messages = conversation.getMessagesFromMark();
-        conversation.mark();
+        const messages = conversation.getMessagesFromMark(this.conversationMark) || [];
+        if (messages.length <= 0) {
+            messages.push(...conversation.messages);
+        }
+        this.conversationMark = conversation.mark();
         let chat = false;
         for (const message of messages) {
             switch (message.role) {
@@ -77,8 +73,7 @@ export class TerminalClient extends BotClient {
             }
         }
         if (chat) {
-            // do not await here otherwise chats will pile up!
-            this.chat(conversation).catch(error => console.error(error));
+            await this.botController.chat(conversation).catch(error => console.error(error));
         }
         process.stdout.write(`${this.username}> `);
     }

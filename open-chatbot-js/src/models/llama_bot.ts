@@ -46,12 +46,12 @@ export class LlamaBot implements BotModel {
             const params = {
                 prompt,
                 stopSequence,
-                temp: conversation.settings.bot_backend.temperature,
-                topP: conversation.settings.bot_backend.top_p,
-                topK: conversation.settings.bot_backend.top_k,
-                typicalP: conversation.settings.bot_backend.typical_p,
-                repeatPenalty: conversation.settings.bot_backend.repetition_penalty,
-                nTokPredict: conversation.settings.bot_backend.max_new_tokens,
+                temp: conversation.botController.settings.bot_backend.temperature,
+                topP: conversation.botController.settings.bot_backend.top_p,
+                topK: conversation.botController.settings.bot_backend.top_k,
+                typicalP: conversation.botController.settings.bot_backend.typical_p,
+                repeatPenalty: conversation.botController.settings.bot_backend.repetition_penalty,
+                nTokPredict: conversation.botController.settings.bot_backend.max_new_tokens,
                 nThreads: 16,
             };
 
