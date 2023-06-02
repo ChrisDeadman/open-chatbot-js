@@ -12,8 +12,7 @@ export enum ConversationChainEvents {
 export class ConversationChain extends EventEmitter {
     rootConversation: Conversation;
     handlers: Map<Conversation, Handlers> = new Map();
-
-    private chatting: Promise<Conversation> | undefined;
+    chatting: Promise<Conversation> | undefined;
 
     constructor(rootConversation: Conversation) {
         super();
@@ -79,15 +78,10 @@ export class ConversationChain extends EventEmitter {
         await this.chatting.then(() => (this.chatting = undefined));
     }
 
-    async push(message: ConvMessage) {
-        const conversations = Array.from(this.handlers.keys());
-        let conversation = await this.chatting;
-        if (conversation && conversations.includes(conversation)) {
-            conversation = this.getNextConversation(conversation) || this.rootConversation;
-        } else {
-            conversation = conversations.at(0) || this.rootConversation;
-        }
+    async push(message: ConvMessage): Promise<Conversation> {
+        const conversation = (await this.chatting) || this.rootConversation;
         conversation.push(message);
+        return conversation;
     }
 
     private getPreviousConversation(targetConversation: Conversation): Conversation | undefined {

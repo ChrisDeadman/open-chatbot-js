@@ -104,8 +104,19 @@ export class WebClient implements BotClient {
             content = content.trimStart();
             if (content.length > 0) {
                 const userMessage = new ConvMessage('user', sender, content);
+
+                // display message in gui
                 this.io.emit('chat message', sender, content);
-                this.conversationChain.push(userMessage);
+
+                // push to conversation chain
+                this.conversationChain.push(userMessage).then(async conversation => {
+                    // trigger chat if nobody is chatting
+                    if (!this.conversationChain.chatting) {
+                        await this.conversationChain
+                            .chat(conversation)
+                            .catch(error => console.error(error));
+                    }
+                });
             }
         } catch (error) {
             console.error(error);
@@ -128,20 +139,18 @@ export class WebClient implements BotClient {
         }
     }
 
-    private async onChatting(conversation: Conversation) {
+    private onChatting(conversation: Conversation) {
         this.io.emit('typing', `${conversation.botController.settings.bot_name} is typing`);
     }
 
-    private async onConversationUpdated(conversation: Conversation) {
+    private onConversationUpdated(conversation: Conversation) {
         const mark = this.conversationMarks.get(conversation);
         const messages = conversation.getMessagesFromMark(mark) || conversation.messages;
         this.conversationMarks.set(conversation, conversation.mark());
-        let shouldChat = false;
         for (const message of messages) {
             switch (message.role) {
                 case 'user': {
-                    shouldChat = message.sender == this.username;
-                    if (!shouldChat) {
+                    if (message.sender != this.username) {
                         // User message handled in onChatMessage
                         this.io.emit('chat message', message.sender, message.content);
                     }
@@ -158,9 +167,6 @@ export class WebClient implements BotClient {
                     this.io.emit('chat message', message.sender, message.content);
                     break;
             }
-        }
-        if (shouldChat) {
-            await this.conversationChain.chat(conversation).catch(error => console.error(error));
         }
     }
 
@@ -197,7 +203,7 @@ export class WebClient implements BotClient {
         }
     }
 
-    private async onDeleteBot(botName: string) {
+    private onDeleteBot(botName: string) {
         try {
             const bot = this.bots[botName];
             this.conversationChain.removeConversation(bot.conversation);
