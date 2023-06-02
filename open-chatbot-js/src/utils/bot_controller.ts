@@ -48,10 +48,11 @@ export class BotController {
         switch (this.settings.bot_backend.name) {
             case 'openai': {
                 const openAiBot = new OpenAIBot(
-                    this.settings.bot_name,
                     this.settings.bot_backend.api_key,
                     this.settings.bot_backend.model,
-                    this.settings.bot_backend.token_limit
+                    this.settings.embedding_backend.model,
+                    this.settings.bot_backend.token_limit,
+                    this.settings.bot_backend.rate_limit_ms
                 );
                 this.botModel = openAiBot;
                 this.tokenModel = openAiBot;
@@ -149,10 +150,7 @@ export class BotController {
             );
 
             // Execute commands
-            if (
-                conversation.botController.settings.allow_commands === true &&
-                responseData.commands.length > 0
-            ) {
+            if (responseData.commands.length > 0) {
                 responseData.commands.forEach((cmd: Record<string, string>) => {
                     console.debug(`CMD: ${JSON.stringify(cmd)}`);
                     switch (cmd.command) {

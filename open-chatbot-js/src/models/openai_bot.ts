@@ -1,66 +1,52 @@
 import { TiktokenModel, encoding_for_model } from '@dqbd/tiktoken';
 import axios from 'axios';
-import { Job, Queue, QueueEvents, Worker } from 'bullmq';
 import { ChatCompletionRequestMessageRoleEnum, Configuration, OpenAIApi } from 'openai';
-import { settings } from '../settings.js';
 import { ConvMessage } from '../utils/conv_message.js';
 import { Conversation } from '../utils/conversation.js';
 import { BotModel } from './bot_model.js';
 import { EmbeddingModel } from './embedding_model.js';
 import { TokenModel } from './token_model.js';
 
-enum JobType {
-    chat = 'chat',
-    createEmbedding = 'createEmbedding',
-}
-
-type JobData = { messages: ConvMessage[] };
-
 export class OpenAIBot implements BotModel, TokenModel, EmbeddingModel {
+    apiTimeout = 60000;
     dimension = 1536;
     maxTokens: number;
-    private openai: OpenAIApi;
     private model: string;
-    private chatQueue: Queue<JobData, any>;
-    private chatQueueEvents: QueueEvents;
-    private worker: Worker;
+    private embeddingModel: string;
+    private ratelimitMs: number;
+    private openai: OpenAIApi;
 
-    constructor(queueName: string, apiKey: string, model: string, maxTokens: number) {
-        this.maxTokens = maxTokens;
-        this.openai = new OpenAIApi(new Configuration({ apiKey: apiKey }));
+    constructor(
+        apiKey: string,
+        model: string,
+        embeddingModel: string,
+        maxTokens: number,
+        ratelimitMs: number
+    ) {
         this.model = model;
-
-        this.chatQueue = new Queue<JobData, any>(`queue:${queueName}:jobs`, {
-            connection: {
-                host: settings.memory_backend.redis_host,
-                port: settings.memory_backend.redis_port,
-            },
-        });
-        this.chatQueue.obliterate({ force: true }); // remove old jobs
-        this.chatQueueEvents = new QueueEvents(this.chatQueue.name, {
-            connection: {
-                host: settings.memory_backend.redis_host,
-                port: settings.memory_backend.redis_port,
-            },
-        });
-        this.worker = new Worker(this.chatQueue.name, this.processChatJob.bind(this), {
-            connection: {
-                host: settings.memory_backend.redis_host,
-                port: settings.memory_backend.redis_port,
-            },
-            limiter: {
-                max: 1,
-                duration: settings.bot_backend.rate_limit_ms,
-            },
-        });
+        this.embeddingModel = embeddingModel;
+        this.maxTokens = maxTokens;
+        this.ratelimitMs = ratelimitMs;
+        this.openai = new OpenAIApi(new Configuration({ apiKey }));
     }
 
     async chat(conversation: Conversation): Promise<string> {
         const messages = await conversation.getPrompt();
-        const job = await this.chatQueue.add(JobType.chat.toString(), {
-            messages,
-        });
-        const result = await job.waitUntilFinished(this.chatQueueEvents);
+        const job = async () => {
+            console.debug(`OpenAI: chat with ${messages.length} messages...`);
+            const completion = await this.openai.createChatCompletion(
+                {
+                    model: this.model,
+                    messages: messages.map(this.convMessageToOpenAIMessage.bind(this)),
+                },
+                {
+                    timeout: this.apiTimeout,
+                }
+            );
+            const message = completion.data.choices[0].message;
+            return message ? message.content : '';
+        };
+        const result = this.processJob(job);
         if (result != null) {
             return result;
         }
@@ -71,14 +57,24 @@ export class OpenAIBot implements BotModel, TokenModel, EmbeddingModel {
         if (content.length <= 0) {
             return [];
         }
-        const job = await this.chatQueue.add(JobType.createEmbedding.toString(), {
-            messages: [new ConvMessage('system', 'system', content)],
-        });
-        const result = await job.waitUntilFinished(this.chatQueueEvents);
-        if (result === null) {
-            return [];
+        const job = async () => {
+            console.debug(`OpenAI: createEmbedding for ${content.length} chars...`);
+            const result = await this.openai.createEmbedding(
+                {
+                    input: content,
+                    model: this.embeddingModel,
+                },
+                {
+                    timeout: this.apiTimeout,
+                }
+            );
+            return result.data.data[0].embedding;
+        };
+        const result = this.processJob(job);
+        if (result != null) {
+            return result;
         }
-        return result;
+        return [];
     }
 
     async tokenize(content: string): Promise<number[]> {
@@ -90,64 +86,29 @@ export class OpenAIBot implements BotModel, TokenModel, EmbeddingModel {
         }
     }
 
-    private async processChatJob(job: Job<JobData>): Promise<any | null> {
-        let result: any;
-        try {
-            console.debug(`OpenAI: ${job.name} with ${job.data.messages.length} messages...`);
-            const startTime = Date.now();
-
-            switch (JobType[job.name as keyof typeof JobType]) {
-                case JobType.chat: {
-                    result = await this.createChatCompletion(job.data.messages);
-                    break;
+    private async processJob(job: () => Promise<any>): Promise<any> {
+        let result: any = null;
+        while (result === null) {
+            try {
+                const startTime = Date.now();
+                result = await job();
+                const endTime = Date.now();
+                const elapsedMs = endTime - startTime;
+                console.debug(`OpenAI: response took ${elapsedMs}ms`);
+            } catch (error) {
+                console.error(`OpenAI: ${error}`);
+                if (axios.isAxiosError(error)) {
+                    const status = error.response?.status;
+                    if (status === undefined || status === 429) {
+                        // Obey OpenAI rate limit or retry on timeout
+                        await new Promise(resolve => setTimeout(resolve, this.ratelimitMs));
+                        continue;
+                    }
                 }
-                case JobType.createEmbedding: {
-                    result = await this._createEmbedding(job.data.messages);
-                    break;
-                }
-                default: {
-                    throw new Error('Job Type not implemented.');
-                }
-            }
-
-            const endTime = Date.now();
-            const elapsedMs = endTime - startTime;
-            console.debug(`OpenAI: response took ${elapsedMs}ms`);
-            this.worker.rateLimit(settings.bot_backend.rate_limit_ms);
-        } catch (error) {
-            console.error(`OpenAI: ${error}`);
-            if (axios.isAxiosError(error)) {
-                // Obey OpenAI rate limit or retry on timeout
-                const status = error.response?.status;
-                if (status === undefined || status === 429) {
-                    this.worker.rateLimit(settings.bot_backend.rate_limit_ms);
-                    throw Worker.RateLimitError();
-                }
+                break;
             }
         }
         return result;
-    }
-
-    private async createChatCompletion(messages: ConvMessage[]): Promise<string> {
-        const completion = await this.openai.createChatCompletion(
-            {
-                model: this.model,
-                messages: messages.map(this.convMessageToOpenAIMessage.bind(this)),
-            },
-            {
-                timeout: settings.browser_timeout,
-            }
-        );
-        const message = completion.data.choices[0].message;
-        return message ? message.content : '';
-    }
-
-    private async _createEmbedding(messages: ConvMessage[]): Promise<number[]> {
-        const result = await this.openai.createEmbedding({
-            input: messages.map(m => m.content),
-            model: settings.embedding_backend.model,
-        });
-        return result.data.data[0].embedding;
     }
 
     private convMessageToOpenAIMessage(message: ConvMessage): {
