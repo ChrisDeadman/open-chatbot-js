@@ -6,7 +6,7 @@ type Handler = (conversation: Conversation) => Promise<void>;
 type Handlers = { fromPrev: Handler; toNext: Handler };
 
 export enum ConversationChainEvents {
-    Chatting = 'chatting'
+    Chatting = 'chatting',
 }
 
 export class ConversationChain extends EventEmitter {
@@ -80,9 +80,14 @@ export class ConversationChain extends EventEmitter {
     }
 
     async push(message: ConvMessage) {
-        const conversation = (await this.chatting) || this.rootConversation;
-        const nextConversation = this.getNextConversation(conversation) || this.rootConversation;
-        nextConversation.push(message);
+        const conversations = Array.from(this.handlers.keys());
+        let conversation = await this.chatting;
+        if (conversation && conversations.includes(conversation)) {
+            conversation = this.getNextConversation(conversation) || this.rootConversation;
+        } else {
+            conversation = conversations.at(0) || this.rootConversation;
+        }
+        conversation.push(message);
     }
 
     private getPreviousConversation(targetConversation: Conversation): Conversation | undefined {
