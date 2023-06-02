@@ -113,52 +113,56 @@ export class Conversation extends EventEmitter {
     }
 
     async getPrompt(): Promise<ConvMessage[]> {
+        const prefix = [];
         const messages: ConvMessage[] = [];
 
-        // parse tools
-        const toolsTemplate = new PromptTemplate({
-            inputVariables: [...Object.keys(this.botController.settings), 'now'],
-            template: this.botController.settings.prompt_templates.tools.join('\n'),
-        });
-        const tools = await toolsTemplate.format({
-            ...this.botController.settings,
-            now: dateTimeToStr(new Date(), this.botController.settings.locale),
-        });
+        // Use fixed prompt as prefix if defined
+        if (this.fixedPrompt != undefined) {
+            prefix.push(this.fixedPrompt);
+        } else {
+            // parse tools
+            const toolsTemplate = new PromptTemplate({
+                inputVariables: [...Object.keys(this.botController.settings), 'now'],
+                template: this.botController.settings.prompt_templates.tools.join('\n'),
+            });
+            const tools = await toolsTemplate.format({
+                ...this.botController.settings,
+                now: dateTimeToStr(new Date(), this.botController.settings.locale),
+            });
 
-        // parse prefix
-        if (this.fixedPrompt === undefined) {
+            // parse prefix
             const prefixTemplate = new PromptTemplate({
                 inputVariables: [...Object.keys(this.botController.settings), 'tools', 'now'],
                 template: this.botController.settings.prompt_templates.prefix.join('\n'),
             });
-            const prefix = await prefixTemplate.format({
-                ...this.botController.settings,
-                tools: tools,
-                now: dateTimeToStr(new Date(), this.botController.settings.locale),
-            });
+            prefix.push(
+                await prefixTemplate.format({
+                    ...this.botController.settings,
+                    tools: tools,
+                    now: dateTimeToStr(new Date(), this.botController.settings.locale),
+                })
+            );
 
-            // parse history
-            const historyTemplate = new PromptTemplate({
-                inputVariables: [...Object.keys(this.botController.settings), 'now'],
-                template: this.botController.settings.prompt_templates.history.join('\n'),
-            });
-            const history = await historyTemplate.format({
-                ...this.botController.settings,
-                now: dateTimeToStr(new Date(), this.botController.settings.locale),
-            });
+            // if we're not at capacity: append history to prefix
+            if (this.messageBuffer.length < this.messageBuffer.capacity) {
+                // parse history
+                const historyTemplate = new PromptTemplate({
+                    inputVariables: [...Object.keys(this.botController.settings), 'now'],
+                    template: this.botController.settings.prompt_templates.history.join('\n'),
+                });
+                const history = await historyTemplate.format({
+                    ...this.botController.settings,
+                    now: dateTimeToStr(new Date(), this.botController.settings.locale),
+                });
 
-            // combine and add them to the memories
-            const combined = `${prefix}\n${history}`;
-            if (combined.length >= 0) {
-                await this.appendMessages(messages, [
-                    new ConvMessage('system', 'system', combined),
-                ]);
+                prefix.push(history);
             }
-        } else {
-            await this.appendMessages(messages, [
-                new ConvMessage('system', 'system', this.fixedPrompt),
-            ]);
         }
+
+        // append the prefix
+        await this.appendMessages(messages, [
+            new ConvMessage('system', 'system', prefix.join('\n')),
+        ]);
 
         if (this.botController.memory && this.memoryContext.length >= 0) {
             // get memories related to the memory vector
@@ -176,7 +180,12 @@ export class Conversation extends EventEmitter {
         }
 
         // add most recent messages, save some tokens for the response
-        await this.appendMessages(messages, [...this.messageBuffer], true, -512);
+        await this.appendMessages(
+            messages,
+            [...this.messageBuffer],
+            true,
+            -this.botController.settings.bot_backend.max_new_tokens
+        );
 
         return messages;
     }

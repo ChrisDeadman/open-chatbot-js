@@ -1,12 +1,16 @@
 export class CyclicBuffer<T> implements Iterable<T> {
     private items: T[];
-    private capacity: number;
+    private _capacity: number;
     private firstItemIndex = -1;
     private curItemIndex = -1;
 
     constructor(capacity: number) {
-        this.capacity = capacity;
+        this._capacity = capacity;
         this.items = new Array<T>(capacity);
+    }
+
+    get capacity(): number {
+        return this._capacity;
     }
 
     get length(): number {
