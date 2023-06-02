@@ -7,6 +7,7 @@ import { CyclicBuffer } from './cyclic_buffer.js';
 
 export enum ConversationEvents {
     Updated = 'updated',
+    UpdatedDelayed = 'updated delayed',
     Cleared = 'cleared',
 }
 
@@ -45,10 +46,14 @@ export class Conversation extends EventEmitter {
         }
         this.messageBuffer.push(...messages);
 
+        // Update memory context and emit updated event
+        this.updateMemoryContext();
+        this.emit(ConversationEvents.Updated, this);
+
+        // Emit delayed update event
         if (this.delayTimeout) {
             clearTimeout(this.delayTimeout);
         }
-
         const timeoutFunc = async () => {
             // Cancelled
             if (this.delayTimeout === undefined) {
@@ -59,17 +64,16 @@ export class Conversation extends EventEmitter {
                 this.delayTimeout = setTimeout(timeoutFunc);
                 return;
             }
-            // Process updated event
+            // Update memory context and emit delayed update event
             this.updating = true;
             try {
                 await this.updateMemoryContext();
-                this.emit(ConversationEvents.Updated, this);
+                this.emit(ConversationEvents.UpdatedDelayed, this);
             } finally {
                 this.delayTimeout = undefined;
                 this.updating = false;
             }
         };
-
         this.delayTimeout = setTimeout(
             timeoutFunc,
             this.botController.settings.chat_process_delay_ms

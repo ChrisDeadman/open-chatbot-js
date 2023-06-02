@@ -19,7 +19,7 @@ export class ConversationChain {
 
         const sourceHandlers = this.handlers.get(sourceConversation);
         if (sourceHandlers) {
-            sourceConversation?.off(ConversationEvents.Updated, sourceHandlers.toNext);
+            sourceConversation?.off(ConversationEvents.UpdatedDelayed, sourceHandlers.toNext);
         }
 
         const fromPrev = this.createHandler(sourceConversation, targetConversation);
@@ -169,8 +169,8 @@ export class ConversationChain {
         console.debug(
             `ConversationChain: subscribeHandlers [${sourceConversation.botController.settings.bot_name}] => [${targetConversation.botController.settings.bot_name}]`
         );
-        sourceConversation.on(ConversationEvents.Updated, handlers.fromPrev);
-        targetConversation.on(ConversationEvents.Updated, handlers.toNext);
+        sourceConversation.on(ConversationEvents.UpdatedDelayed, handlers.fromPrev);
+        targetConversation.on(ConversationEvents.UpdatedDelayed, handlers.toNext);
     }
 
     private unsubscribeHandlers(
@@ -185,8 +185,8 @@ export class ConversationChain {
             `ConversationChain: unsubscribeHandlers [${actualSourceConversation.botController.settings.bot_name}] => [${targetConversation.botController.settings.bot_name}]`
         );
 
-        actualSourceConversation.off(ConversationEvents.Updated, handlers.fromPrev);
-        targetConversation.off(ConversationEvents.Updated, handlers.toNext);
+        actualSourceConversation.off(ConversationEvents.UpdatedDelayed, handlers.fromPrev);
+        targetConversation.off(ConversationEvents.UpdatedDelayed, handlers.toNext);
     }
 
     private relinkHandlers(
@@ -207,7 +207,7 @@ export class ConversationChain {
 
         // create and link new handler
         const handler = this.createHandler(actualSourceConversation, actualTargetConversation);
-        actualSourceConversation.on(ConversationEvents.Updated, handler);
+        actualSourceConversation.on(ConversationEvents.UpdatedDelayed, handler);
 
         // update handler mapping
         if (sourceConversation) {
