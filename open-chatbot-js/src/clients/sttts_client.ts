@@ -6,7 +6,7 @@ import { BotClient } from './bot_client.js';
 export class STTTSClient implements BotClient {
     private botController: BotController;
     private conversation: Conversation;
-    private conversationMark: ConvMessage | undefined;
+    private conversationSequence: number | undefined;
 
     private username;
     private new_conversation_delay;
@@ -36,11 +36,10 @@ export class STTTSClient implements BotClient {
     }
 
     async onConversationUpdated(conversation: Conversation) {
-        const messages = conversation.getMessagesFromMark(this.conversationMark) || [];
-        if (messages.length <= 0) {
-            messages.push(...conversation.messages);
+        const messages = conversation.getMessagesAfter(this.conversationSequence);
+        if (messages.length > 0) {
+            this.conversationSequence = messages.at(-1)?.sequence;
         }
-        this.conversationMark = conversation.mark();
         let chat = false;
         for (const message of messages) {
             switch (message.role) {

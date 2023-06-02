@@ -19,7 +19,7 @@ export class WebClient implements BotClient {
     private mainController: BotController;
     private conversation: Conversation;
     private conversationChain: ConversationChain;
-    private conversationMarks: Map<Conversation, ConvMessage | undefined> = new Map();
+    private conversationSequences: Map<Conversation, number | undefined> = new Map();
 
     private bots: Record<string, { conversation: Conversation; controller: BotController }> = {};
 
@@ -126,7 +126,7 @@ export class WebClient implements BotClient {
     private onReset() {
         console.info('Client: Conversation reset()');
         this.conversationChain.clear();
-        this.conversationMarks.clear();
+        this.conversationSequences.clear();
         this.io.emit('reset');
     }
 
@@ -144,9 +144,11 @@ export class WebClient implements BotClient {
     }
 
     private onConversationUpdated(conversation: Conversation) {
-        const mark = this.conversationMarks.get(conversation);
-        const messages = conversation.getMessagesFromMark(mark) || conversation.messages;
-        this.conversationMarks.set(conversation, conversation.mark());
+        const sequence = this.conversationSequences.get(conversation);
+        const messages = conversation.getMessagesAfter(sequence);
+        if (messages.length > 0) {
+            this.conversationSequences.set(conversation, messages.at(-1)?.sequence);
+        }
         for (const message of messages) {
             switch (message.role) {
                 case 'user': {

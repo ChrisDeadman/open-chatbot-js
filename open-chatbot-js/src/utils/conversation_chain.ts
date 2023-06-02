@@ -103,34 +103,22 @@ export class ConversationChain extends EventEmitter {
             const srcName = source.botController.settings.bot_name;
             const dstName = destination.botController.settings.bot_name;
 
-            const dstMessages = destination.messages;
-            const newMessages = [];
-            if (dstMessages.length <= 0) {
-                newMessages.push(...source.messages.map(m => this.transformMessage(m)));
-            }
-            while (dstMessages.length > 0) {
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                const dstMark = dstMessages.pop()!;
-                const srcMark = this.reverseTransformMessage(dstMark, srcName);
-                const srcMessages = source.getMessagesFromMark(srcMark);
-                if (srcMessages) {
-                    if (srcMessages.length > 0) {
-                        newMessages.push(...srcMessages.map(m => this.transformMessage(m)));
-                    }
-                    break;
-                }
+            const sequence = destination.messages.at(-1)?.sequence;
+            const newMessages = source
+                .getMessagesAfter(sequence)
+                .map(m => this.transformMessage(m));
+            if (newMessages.length <= 0) {
+                return;
             }
 
-            if (newMessages.length > 0) {
-                console.debug(
-                    `ConversationChain: [${srcName}]: forwarding ${newMessages.length} messages => [${dstName}]`
-                );
-                destination.push(...newMessages);
-            }
+            console.debug(
+                `ConversationChain: [${srcName}]: forwarding ${newMessages.length} messages => [${dstName}]`
+            );
+            destination.push(...newMessages);
 
             // only trigger the chat if the sender is the previous source
             const shouldChat =
-                newMessages.filter(m => m.role === 'user' /* && m.sender === srcName*/).length > 0;
+                newMessages.filter(m => m.role === 'user' /*&& m.sender === srcName*/).length > 0;
             if (shouldChat) {
                 await this.chat(destination).catch(error => {
                     console.error(error);
@@ -150,21 +138,7 @@ export class ConversationChain extends EventEmitter {
                 role = message.role;
                 break;
         }
-        return new ConvMessage(role, message.sender, message.content);
-    }
-
-    private reverseTransformMessage(message: ConvMessage, botname: string): ConvMessage {
-        let role: string;
-        switch (message.role) {
-            case 'user':
-            case 'assistant':
-                role = message.sender === botname ? 'assistant' : 'user';
-                break;
-            default:
-                role = message.role;
-                break;
-        }
-        return new ConvMessage(role, message.sender, message.content);
+        return new ConvMessage(role, message.sender, message.content, message.sequence);
     }
 
     private subscribeHandlers(

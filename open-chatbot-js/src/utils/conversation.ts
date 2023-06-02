@@ -84,32 +84,25 @@ export class Conversation extends EventEmitter {
         return [...this.messageBuffer];
     }
 
-    getMessagesFromMark(mark: ConvMessage | undefined): ConvMessage[] | undefined {
+    getMessagesAfter(sequence: number | undefined): ConvMessage[] {
         // Copy the CyclicBuffer messages to a standard array
         const messagesArray = [...this.messageBuffer];
 
-        // If markMessage is undefined, return all messages
-        if (!mark) {
+        // If sequence is undefined, return all messages
+        if (sequence === undefined) {
             return messagesArray;
         }
 
-        // Find the index of the markMessage in the array
-        const markIndex = messagesArray.findLastIndex(msg => msg.equals(mark));
+        // Find the index of the sequence in the array
+        const sequenceIndex = messagesArray.findLastIndex(msg => msg.sequence <= sequence);
 
-        // Return undefined if the markMessage wasn't found
-        if (markIndex < 0) {
-            return undefined;
+        // Return empty array if the sequence wasn't found
+        if (sequenceIndex < 0) {
+            return [];
         }
 
-        // Return the slice of the array starting from the message after the mark
-        return messagesArray.slice(markIndex + 1);
-    }
-
-    mark(idx?: number): ConvMessage | undefined {
-        if (idx == null) {
-            idx = -1;
-        }
-        return [...this.messageBuffer].at(idx);
+        // Return the slice of the array starting from the message with a higher sequence
+        return messagesArray.slice(sequenceIndex + 1);
     }
 
     async getPrompt(): Promise<ConvMessage[]> {

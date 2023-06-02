@@ -25,7 +25,7 @@ export class DiscordClient implements BotClient {
     private commands = new Collection<string, any>();
     private commandArray = new Array<any>();
     private conversation: { [key: Snowflake]: Conversation } = {};
-    private conversationMarks: Map<Conversation, ConvMessage | undefined> = new Map();
+    private conversationSequences: Map<Conversation, number | undefined> = new Map();
     private typingTimeout: NodeJS.Timeout | undefined;
 
     constructor(settings: any) {
@@ -271,12 +271,11 @@ export class DiscordClient implements BotClient {
 
     private async onConversationUpdated(conversation: Conversation) {
         const channel = conversation.context;
-        const mark = this.conversationMarks.get(conversation);
-        const messages = conversation.getMessagesFromMark(mark) || [];
-        if (messages.length <= 0) {
-            messages.push(...conversation.messages);
+        const sequence = this.conversationSequences.get(conversation);
+        const messages = conversation.getMessagesAfter(sequence);
+        if (messages.length > 0) {
+            this.conversationSequences.set(conversation, messages.at(-1)?.sequence);
         }
-        this.conversationMarks.set(conversation, conversation.mark());
         let chat = false;
         for (const message of messages) {
             switch (message.role) {

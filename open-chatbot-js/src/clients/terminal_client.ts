@@ -7,7 +7,7 @@ import { BotController } from '../utils/bot_controller.js';
 export class TerminalClient implements BotClient {
     private rlInterface: any;
     private conversation: Conversation;
-    private conversationMark: ConvMessage | undefined;
+    private conversationSequence: number | undefined;
 
     private username;
     private botController: BotController;
@@ -49,11 +49,10 @@ export class TerminalClient implements BotClient {
     }
 
     async onConversationUpdated(conversation: Conversation) {
-        const messages = conversation.getMessagesFromMark(this.conversationMark) || [];
-        if (messages.length <= 0) {
-            messages.push(...conversation.messages);
+        const messages = conversation.getMessagesAfter(this.conversationSequence);
+        if (messages.length > 0) {
+            this.conversationSequence = messages.at(-1)?.sequence;
         }
-        this.conversationMark = conversation.mark();
         let chat = false;
         for (const message of messages) {
             switch (message.role) {

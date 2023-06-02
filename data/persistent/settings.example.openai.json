@@ -4,6 +4,7 @@
     "name": "openai",
     "model": "gpt-3.5-turbo",
     "api_key": "YOUR_API_KEY",
+    "max_new_tokens": 512,
     "token_limit": 4000,
     "rate_limit_ms": 7500
   },
