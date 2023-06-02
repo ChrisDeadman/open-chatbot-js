@@ -12,8 +12,6 @@ const botList = document.getElementById("botList");
 const addBotDropDown = document.getElementById("addBotDropDown");
 const addBotDropdownMenuLink = document.getElementById("addBotDropdownMenuLink");
 
-let typing = false;
-
 // Initialize connection to backend
 const socket = io();
 socket.emit("ready");
@@ -36,8 +34,18 @@ marked.use(
   })
 );
 
+const typingContainer = document.createElement("div", "mb-2");
+typingContainer.classList.add("d-flex", "flex-row", "align-items-center");
+
+const typingMessage = document.createElement("p");
+typingMessage.classList.add("fst-italic", "mx-1");
+typingContainer.appendChild(typingMessage);
+
+const typingSpinner = buildTypingIndicator();
+typingContainer.appendChild(typingSpinner);
+
 const typingIndicator = buildMessageContainer(
-  buildMessageHeader(buildMessageIcon("fa-solid", "fa-robot"), buildTypingIndicator()),
+  buildMessageHeader(buildMessageIcon("fa-solid", "fa-robot"), typingContainer),
   document.createElement("div"),
   "bg-secondary"
 );
@@ -245,32 +253,33 @@ socket.on("chat message", function (sender, message) {
     )
   );
 
-  if (typing) {
+  if (typingMessage.textContent.length > 0) {
     showTypingIndicator();
   }
 });
 
-socket.on("typing", function () {
-  typing = true;
+socket.on("typing", function (message) {
+  typingMessage.textContent = message;
   showTypingIndicator();
 });
 
 socket.on("stop typing", function () {
-  typing = false;
+  typingMessage.textContent = "";
   hideTypingIndicator();
 });
 
 function showTypingIndicator() {
   const scroll = shouldScroll(messages, 1);
-  messages.scrollHeight - (messages.scrollTop + messages.clientHeight) < 100;
-  if (messages.children.length % 2 == 0) {
-    typingIndicator.classList.remove("bg-primary");
-    typingIndicator.classList.add("bg-secondary");
-  } else {
+  const indicatorShown = messages.contains(typingIndicator);
+  const numMessages = messages.children.length;
+  if ((numMessages + (indicatorShown ? 0 : 1)) % 2 === 0) {
     typingIndicator.classList.remove("bg-secondary");
     typingIndicator.classList.add("bg-primary");
+  } else {
+    typingIndicator.classList.remove("bg-primary");
+    typingIndicator.classList.add("bg-secondary");
   }
-  if (!messages.contains(typingIndicator)) {
+  if (!indicatorShown) {
     messages.appendChild(typingIndicator);
   }
   if (scroll) {
@@ -330,8 +339,10 @@ function buildMessageElement(messageText) {
 }
 
 function buildTypingIndicator() {
-  const element = document.createElement("i");
-  element.classList.add("fa-solid", "fa-spinner", "fa-spin", "ms-1");
+  const element = document.createElement("div");
+  const spinner = document.createElement("i");
+  spinner.classList.add("fa-solid", "fa-spinner", "fa-spin", "ms-1");
+  element.appendChild(spinner);
   return element;
 }
 

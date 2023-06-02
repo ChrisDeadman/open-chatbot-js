@@ -8,7 +8,7 @@ import { readSettings } from '../settings.js';
 import { BotController } from '../utils/bot_controller.js';
 import { ConvMessage } from '../utils/conv_message.js';
 import { Conversation, ConversationEvents } from '../utils/conversation.js';
-import { ConversationChain } from '../utils/conversation_chain.js';
+import { ConversationChain, ConversationChainEvents } from '../utils/conversation_chain.js';
 import { BotClient } from './bot_client.js';
 
 export class WebClient implements BotClient {
@@ -77,6 +77,8 @@ export class WebClient implements BotClient {
         );
 
         this.conversation.on(ConversationEvents.Updated, this.onConversationUpdated.bind(this));
+        this.conversationChain.on(ConversationChainEvents.Chatting, this.onChatting.bind(this));
+
         await this.mainController.init();
         console.log('Client startup complete.');
     }
@@ -126,6 +128,10 @@ export class WebClient implements BotClient {
         }
     }
 
+    private async onChatting(conversation: Conversation) {
+        this.io.emit('typing', `${conversation.botController.settings.bot_name} is typing`);
+    }
+
     private async onConversationUpdated(conversation: Conversation) {
         const mark = this.conversationMarks.get(conversation);
         const messages = conversation.getMessagesFromMark(mark) || conversation.messages;
@@ -154,7 +160,6 @@ export class WebClient implements BotClient {
             }
         }
         if (shouldChat) {
-            this.io.emit('typing', `${conversation.botController.settings.bot_name} is typing...`);
             await this.conversationChain.chat(conversation).catch(error => console.error(error));
         }
     }

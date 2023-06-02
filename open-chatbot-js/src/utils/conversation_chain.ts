@@ -1,16 +1,22 @@
+import { EventEmitter } from 'events';
 import { ConvMessage } from './conv_message.js';
 import { Conversation, ConversationEvents } from './conversation.js';
 
 type Handler = (conversation: Conversation) => Promise<void>;
 type Handlers = { fromPrev: Handler; toNext: Handler };
 
-export class ConversationChain {
+export enum ConversationChainEvents {
+    Chatting = 'chatting'
+}
+
+export class ConversationChain extends EventEmitter {
     rootConversation: Conversation;
     handlers: Map<Conversation, Handlers> = new Map();
 
     private chatting: Promise<Conversation> | undefined;
 
     constructor(rootConversation: Conversation) {
+        super();
         this.rootConversation = rootConversation;
     }
 
@@ -66,6 +72,7 @@ export class ConversationChain {
         }
 
         // Chat with the bot
+        this.emit(ConversationChainEvents.Chatting, conversation);
         this.chatting = conversation.botController.chat(conversation).then(() => conversation);
         const botname = conversation.botController.settings.bot_name;
         console.debug(`ConversationChain: [${botname}]: chat`);
