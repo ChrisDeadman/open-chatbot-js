@@ -123,7 +123,7 @@ export class DiscordClient implements BotClient {
         if (!(channel.id in this.conversation)) {
             this.conversation[channel.id] = new Conversation(this.botController, channel);
             this.conversation[channel.id].on(
-                ConversationEvents.Updated,
+                ConversationEvents.UpdatedDelayed,
                 this.onConversationUpdated.bind(this)
             );
         }

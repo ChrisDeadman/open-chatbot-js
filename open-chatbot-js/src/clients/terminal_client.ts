@@ -1,12 +1,13 @@
 import readline from 'readline';
-import { ConvMessage } from '../utils/conv_message.js';
-import { Conversation, ConversationEvents } from '../utils/conversation.js';
-import { BotClient } from './bot_client.js';
 import { BotController } from '../utils/bot_controller.js';
+import { ConvMessage } from '../utils/conv_message.js';
+import { Conversation } from '../utils/conversation.js';
+import { ConversationChain, ConversationChainEvents } from '../utils/conversation_chain.js';
+import { BotClient } from './bot_client.js';
 
 export class TerminalClient implements BotClient {
     private rlInterface: any;
-    private conversation: Conversation;
+    private conversationChain: ConversationChain;
     private conversationSequence: number | undefined;
 
     private username;
@@ -15,10 +16,13 @@ export class TerminalClient implements BotClient {
     constructor(settings: any, username = 'User') {
         this.botController = new BotController(settings);
         this.username = username;
-        this.conversation = new Conversation(this.botController);
+        this.conversationChain = new ConversationChain();
+        this.conversationChain.addConversation(new Conversation(this.botController));
     }
 
     async startup() {
+        await this.botController.init();
+
         this.rlInterface = readline.createInterface({
             input: process.stdin,
             terminal: false,
@@ -26,18 +30,29 @@ export class TerminalClient implements BotClient {
 
         this.rlInterface.on('line', async (line: string) => {
             try {
-                line = line.trim();
-                if (line.length > 0) {
-                    // Add new message to conversation
-                    this.conversation.push(new ConvMessage('user', this.username, line));
+                const messageContent = line.trim();
+                if (messageContent.length > 0) {
+                    const message = new ConvMessage('user', this.username, messageContent);
+
+                    // push to conversation chain
+                    this.conversationChain.push(message).then(async conversation => {
+                        // trigger chat if nobody is chatting
+                        if (!this.conversationChain.chatting) {
+                            await this.conversationChain
+                                .chat(conversation)
+                                .catch(error => console.error(error));
+                        }
+                    });
                 }
             } catch (error) {
                 console.error(error);
             }
         });
 
-        this.conversation.on(ConversationEvents.Updated, this.onConversationUpdated.bind(this));
-        await this.botController.init();
+        this.conversationChain.on(
+            ConversationChainEvents.Updated,
+            this.onConversationUpdated.bind(this)
+        );
 
         console.log('Client startup complete.');
         process.stdout.write(`${this.username}> `);
@@ -53,27 +68,27 @@ export class TerminalClient implements BotClient {
         if (messages.length > 0) {
             this.conversationSequence = messages.at(-1)?.sequence;
         }
-        let chat = false;
+        let printPrompt = true;
         for (const message of messages) {
             switch (message.role) {
                 case 'user': {
                     if (message.sender != this.username) {
                         process.stdout.write(`${message.sender}: ${message.content}\n`);
+                    } else {
+                        printPrompt = false;
                     }
-                    chat = true;
                     break;
                 }
                 case 'assistant':
                     process.stdout.write(`${message.sender}: ${message.content}\n`);
                     break;
-                case 'system':
+                default:
                     process.stdout.write(`\n${message.content}\n`);
                     break;
             }
         }
-        if (chat) {
-            await this.botController.chat(conversation).catch(error => console.error(error));
+        if (printPrompt) {
+            process.stdout.write(`${this.username}> `);
         }
-        process.stdout.write(`${this.username}> `);
     }
 }

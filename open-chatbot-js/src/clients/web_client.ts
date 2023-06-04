@@ -7,7 +7,7 @@ import { Server, Socket } from 'socket.io';
 import { readSettings } from '../settings.js';
 import { BotController } from '../utils/bot_controller.js';
 import { ConvMessage } from '../utils/conv_message.js';
-import { Conversation, ConversationEvents } from '../utils/conversation.js';
+import { Conversation } from '../utils/conversation.js';
 import { ConversationChain, ConversationChainEvents } from '../utils/conversation_chain.js';
 import { BotClient } from './bot_client.js';
 
@@ -17,9 +17,8 @@ export class WebClient implements BotClient {
     private io: Server;
 
     private mainController: BotController;
-    private conversation: Conversation;
     private conversationChain: ConversationChain;
-    private conversationSequences: Map<Conversation, number | undefined> = new Map();
+    private conversationSequence: number | undefined;
 
     private bots: Record<string, { conversation: Conversation; controller: BotController }> = {};
 
@@ -28,10 +27,11 @@ export class WebClient implements BotClient {
     constructor(settings: any, username = 'User') {
         this.username = username;
         this.mainController = new BotController(settings);
-        this.conversation = new Conversation(this.mainController);
-        this.conversationChain = new ConversationChain(this.conversation);
+        const conversation = new Conversation(this.mainController);
+        this.conversationChain = new ConversationChain();
+        this.conversationChain.addConversation(conversation);
         this.bots[settings.bot_name] = {
-            conversation: this.conversation,
+            conversation: conversation,
             controller: this.mainController,
         };
 
@@ -41,6 +41,8 @@ export class WebClient implements BotClient {
     }
 
     async startup() {
+        await this.mainController.init();
+
         const webDataPath = path.join('data', 'web_client');
         this.app.use(express.static(webDataPath)); // contains frontend HTML, JS, CSS files
 
@@ -50,7 +52,7 @@ export class WebClient implements BotClient {
         this.app.get('/', (_req, res) => {
             res.render('index', {
                 username: this.username,
-                settings: this.conversation.botController.settings,
+                settings: this.mainController.settings,
             });
         });
 
@@ -67,19 +69,21 @@ export class WebClient implements BotClient {
         });
 
         this.server.listen(
-            this.conversation.botController.settings.web_server_port,
-            this.conversation.botController.settings.web_server_host,
+            this.mainController.settings.web_server_port,
+            this.mainController.settings.web_server_host,
             () => {
                 console.log(
-                    `web-client listening on http://${this.conversation.botController.settings.web_server_host}:${this.conversation.botController.settings.web_server_port}`
+                    `web-client listening on http://${this.mainController.settings.web_server_host}:${this.mainController.settings.web_server_port}`
                 );
             }
         );
 
-        this.conversation.on(ConversationEvents.Updated, this.onConversationUpdated.bind(this));
+        this.conversationChain.on(
+            ConversationChainEvents.Updated,
+            this.onConversationUpdated.bind(this)
+        );
         this.conversationChain.on(ConversationChainEvents.Chatting, this.onChatting.bind(this));
 
-        await this.mainController.init();
         console.log('Client startup complete.');
     }
 
@@ -94,7 +98,7 @@ export class WebClient implements BotClient {
             socket.emit('new bot', botName);
         }
         // Load the conversation
-        for (const message of this.conversation.messages) {
+        for (const message of this.conversationChain.conversations[0].messages) {
             socket.emit('chat message', message.sender, message.content);
         }
     }
@@ -103,13 +107,11 @@ export class WebClient implements BotClient {
         try {
             content = content.trimStart();
             if (content.length > 0) {
-                const userMessage = new ConvMessage('user', sender, content);
-
-                // display message in gui
-                this.io.emit('chat message', sender, content);
+                const message = new ConvMessage('user', sender, content);
+                this.io.emit('chat message', message.sender, message.content);
 
                 // push to conversation chain
-                this.conversationChain.push(userMessage).then(async conversation => {
+                this.conversationChain.push(message).then(async conversation => {
                     // trigger chat if nobody is chatting
                     if (!this.conversationChain.chatting) {
                         await this.conversationChain
@@ -125,14 +127,14 @@ export class WebClient implements BotClient {
 
     private onReset() {
         console.info('Client: Conversation reset()');
+        this.conversationSequence = undefined;
         this.conversationChain.clear();
-        this.conversationSequences.clear();
         this.io.emit('reset');
     }
 
     private onUpdateSettings(settings: any) {
         for (const [key, value] of Object.entries(settings)) {
-            this.conversation.botController.settings[key] = value;
+            this.mainController.settings[key] = value;
             if (key === 'username') {
                 this.username = String(value);
             }
@@ -144,16 +146,14 @@ export class WebClient implements BotClient {
     }
 
     private onConversationUpdated(conversation: Conversation) {
-        const sequence = this.conversationSequences.get(conversation);
-        const messages = conversation.getMessagesAfter(sequence);
+        const messages = conversation.getMessagesAfter(this.conversationSequence);
         if (messages.length > 0) {
-            this.conversationSequences.set(conversation, messages.at(-1)?.sequence);
+            this.conversationSequence = messages.at(-1)?.sequence;
         }
         for (const message of messages) {
             switch (message.role) {
                 case 'user': {
                     if (message.sender != this.username) {
-                        // User message handled in onChatMessage
                         this.io.emit('chat message', message.sender, message.content);
                     }
                     break;
@@ -165,7 +165,7 @@ export class WebClient implements BotClient {
                     );
                     this.io.emit('chat message', message.sender, message.content);
                     break;
-                case 'system':
+                default:
                     this.io.emit('chat message', message.sender, message.content);
                     break;
             }

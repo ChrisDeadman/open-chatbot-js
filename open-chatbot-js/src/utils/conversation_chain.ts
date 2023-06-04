@@ -3,62 +3,79 @@ import { ConvMessage } from './conv_message.js';
 import { Conversation, ConversationEvents } from './conversation.js';
 
 type Handler = (conversation: Conversation) => Promise<void>;
-type Handlers = { fromPrev: Handler; toNext: Handler };
+type Handlers = { updated: Handler; fromPrev: Handler; toNext: Handler };
 
 export enum ConversationChainEvents {
+    Updated = 'updated',
     Chatting = 'chatting',
 }
 
 export class ConversationChain extends EventEmitter {
-    rootConversation: Conversation;
     handlers: Map<Conversation, Handlers> = new Map();
     chatting: Promise<Conversation> | undefined;
 
-    constructor(rootConversation: Conversation) {
-        super();
-        this.rootConversation = rootConversation;
+    get conversations(): Conversation[] {
+        return Array.from(this.handlers.keys());
     }
 
-    addConversation(targetConversation: Conversation): void {
-        const sourceConversation = Array.from(this.handlers.keys()).at(-1) || this.rootConversation;
-
-        const sourceHandlers = this.handlers.get(sourceConversation);
-        if (sourceHandlers) {
-            sourceConversation?.off(ConversationEvents.UpdatedDelayed, sourceHandlers.toNext);
-        }
-
-        const fromPrev = this.createHandler(sourceConversation, targetConversation);
-        const toNext = this.createHandler(targetConversation, this.rootConversation);
-        const handlers = { fromPrev, toNext };
+    addConversation(conversation: Conversation): void {
+        const conversations = this.conversations;
+        const sourceConversation = conversations.at(-1);
+        const targetConversation = conversations.at(0);
 
         console.debug(
-            `ConversationChain: addConversation [${sourceConversation.botController.settings.bot_name}] => [${targetConversation.botController.settings.bot_name}]`
+            `ConversationChain: addConversation [${conversation.botController.settings.bot_name}]`
         );
 
-        this.subscribeHandlers(sourceConversation, targetConversation, handlers);
+        const handlers: Handlers = {
+            updated: this.createUpdatedHandler(conversation),
+            fromPrev: () => Promise.resolve(),
+            toNext: () => Promise.resolve(),
+        };
 
-        this.handlers.set(targetConversation, {
-            fromPrev: fromPrev,
-            toNext: toNext,
-        });
+        if (sourceConversation && targetConversation) {
+            const sourceHandlers = this.handlers.get(sourceConversation);
+            if (sourceHandlers) {
+                sourceConversation.off(ConversationEvents.UpdatedDelayed, sourceHandlers.toNext);
+            }
+
+            handlers.fromPrev = this.createForwardHandler(sourceConversation, conversation);
+            handlers.toNext = this.createForwardHandler(conversation, targetConversation);
+        }
+
+        this.subscribeHandlers(sourceConversation, conversation, handlers);
+        this.handlers.set(conversation, handlers);
     }
 
-    removeConversation(targetConversation: Conversation): void {
-        if (this.handlers.has(targetConversation)) {
-            const sourceConversation = this.getPreviousConversation(targetConversation);
-            const nextConversation = this.getNextConversation(targetConversation);
+    removeConversation(conversation: Conversation): void {
+        const handlers = this.handlers.get(conversation);
+        if (handlers) {
+            const conversations = this.conversations;
+            const conversationIdx = conversations.indexOf(conversation);
+
+            console.debug(
+                `ConversationChain: removeConversation [${conversation.botController.settings.bot_name}]`
+            );
+
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const targetHandlers = this.handlers.get(targetConversation)!;
+            const source = conversations.at(conversationIdx - 1)!;
+            let target = conversations.at(conversationIdx + 1);
+            if (!target) {
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                target = conversations.at(0)!;
+            }
 
-            this.unsubscribeHandlers(sourceConversation, targetConversation, targetHandlers);
-            this.relinkHandlers(sourceConversation, nextConversation);
+            this.unsubscribeHandlers(source, conversation, handlers);
 
-            this.handlers.delete(targetConversation);
+            if (source != target) {
+                this.relinkHandlers(source, target);
+            }
+
+            this.handlers.delete(conversation);
         }
     }
 
     clear() {
-        this.rootConversation.clear();
         for (const conversation of this.handlers.keys()) {
             conversation.clear();
         }
@@ -79,26 +96,18 @@ export class ConversationChain extends EventEmitter {
     }
 
     async push(message: ConvMessage): Promise<Conversation> {
-        const conversation = (await this.chatting) || this.rootConversation;
+        const conversation = (await this.chatting) || this.handlers.keys().next().value;
         conversation.push(message);
         return conversation;
     }
 
-    private getPreviousConversation(targetConversation: Conversation): Conversation | undefined {
-        const conversations = Array.from(this.handlers.keys());
-        const targetIndex = conversations.indexOf(targetConversation);
-        return targetIndex > 0 ? conversations[targetIndex - 1] : undefined;
+    private createUpdatedHandler(conversation: Conversation): Handler {
+        return async () => {
+            this.emit(ConversationChainEvents.Updated, conversation);
+        };
     }
 
-    private getNextConversation(targetConversation: Conversation): Conversation | undefined {
-        const conversations = Array.from(this.handlers.keys());
-        const targetIndex = conversations.indexOf(targetConversation);
-        return targetIndex >= 0 && targetIndex < conversations.length - 1
-            ? conversations[targetIndex + 1]
-            : undefined;
-    }
-
-    private createHandler(source: Conversation, destination: Conversation): Handler {
+    private createForwardHandler(source: Conversation, destination: Conversation): Handler {
         return async () => {
             const srcName = source.botController.settings.bot_name;
             const dstName = destination.botController.settings.bot_name;
@@ -116,9 +125,8 @@ export class ConversationChain extends EventEmitter {
             );
             destination.push(...newMessages);
 
-            // only trigger the chat if the sender is the previous source
-            const shouldChat =
-                newMessages.filter(m => m.role === 'user' /*&& m.sender === srcName*/).length > 0;
+            // only trigger the chat on user messages
+            const shouldChat = newMessages.filter(m => m.role === 'user').length > 0;
             if (shouldChat) {
                 await this.chat(destination).catch(error => {
                     console.error(error);
@@ -142,69 +150,53 @@ export class ConversationChain extends EventEmitter {
     }
 
     private subscribeHandlers(
-        sourceConversation: Conversation,
-        targetConversation: Conversation,
+        source: Conversation | undefined,
+        target: Conversation | undefined,
         handlers: Handlers
     ): void {
         console.debug(
-            `ConversationChain: subscribeHandlers [${sourceConversation.botController.settings.bot_name}] => [${targetConversation.botController.settings.bot_name}]`
+            `ConversationChain: subscribeHandlers [${source?.botController.settings.bot_name}] => [${target?.botController.settings.bot_name}]`
         );
-        sourceConversation.on(ConversationEvents.UpdatedDelayed, handlers.fromPrev);
-        targetConversation.on(ConversationEvents.UpdatedDelayed, handlers.toNext);
+        source?.on(ConversationEvents.UpdatedDelayed, handlers.fromPrev);
+        target?.on(ConversationEvents.UpdatedDelayed, handlers.toNext);
+        target?.on(ConversationEvents.Updated, handlers.updated);
     }
 
     private unsubscribeHandlers(
-        sourceConversation: Conversation | undefined,
-        targetConversation: Conversation,
+        source: Conversation,
+        target: Conversation,
         handlers: Handlers
     ): void {
-        // if conversation is undefined, it represents the initialConversation
-        const actualSourceConversation = sourceConversation || this.rootConversation;
-
         console.debug(
-            `ConversationChain: unsubscribeHandlers [${actualSourceConversation.botController.settings.bot_name}] => [${targetConversation.botController.settings.bot_name}]`
+            `ConversationChain: unsubscribeHandlers [${source.botController.settings.bot_name}] => [${target.botController.settings.bot_name}]`
         );
 
-        actualSourceConversation.off(ConversationEvents.UpdatedDelayed, handlers.fromPrev);
-        targetConversation.off(ConversationEvents.UpdatedDelayed, handlers.toNext);
+        source.off(ConversationEvents.UpdatedDelayed, handlers.fromPrev);
+        target.off(ConversationEvents.UpdatedDelayed, handlers.toNext);
+        target.off(ConversationEvents.Updated, handlers.updated);
     }
 
-    private relinkHandlers(
-        sourceConversation: Conversation | undefined,
-        targetConversation: Conversation | undefined
-    ): void {
-        if (!sourceConversation && !targetConversation) {
-            return;
-        }
-
-        // if conversation is undefined, it represents the initialConversation
-        const actualSourceConversation = sourceConversation || this.rootConversation;
-        const actualTargetConversation = targetConversation || this.rootConversation;
-
+    private relinkHandlers(source: Conversation, target: Conversation): void {
         console.debug(
-            `ConversationChain: relinkHandlers [${actualSourceConversation.botController.settings.bot_name}] => [${actualTargetConversation.botController.settings.bot_name}]`
+            `ConversationChain: relinkHandlers [${source.botController.settings.bot_name}] => [${target.botController.settings.bot_name}]`
         );
 
         // create and link new handler
-        const handler = this.createHandler(actualSourceConversation, actualTargetConversation);
-        actualSourceConversation.on(ConversationEvents.UpdatedDelayed, handler);
+        const handler = this.createForwardHandler(source, target);
+        source.on(ConversationEvents.UpdatedDelayed, handler);
 
         // update handler mapping
-        if (sourceConversation) {
-            this.handlers.set(sourceConversation, {
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                ...this.handlers.get(sourceConversation)!,
-                toNext: handler,
-            });
-        }
+        this.handlers.set(source, {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            ...this.handlers.get(source)!,
+            toNext: handler,
+        });
 
         // update handler mapping
-        if (targetConversation) {
-            this.handlers.set(targetConversation, {
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                ...this.handlers.get(targetConversation)!,
-                fromPrev: handler,
-            });
-        }
+        this.handlers.set(target, {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            ...this.handlers.get(target)!,
+            fromPrev: handler,
+        });
     }
 }

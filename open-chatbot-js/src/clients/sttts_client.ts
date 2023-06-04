@@ -1,32 +1,35 @@
 import { BotController } from '../utils/bot_controller.js';
 import { ConvMessage } from '../utils/conv_message.js';
-import { Conversation, ConversationEvents } from '../utils/conversation.js';
+import { Conversation } from '../utils/conversation.js';
+import { ConversationChain, ConversationChainEvents } from '../utils/conversation_chain.js';
 import { BotClient } from './bot_client.js';
 
 export class STTTSClient implements BotClient {
     private botController: BotController;
-    private conversation: Conversation;
+    private conversationChain: ConversationChain;
     private conversationSequence: number | undefined;
 
     private username;
     private new_conversation_delay;
     private shutdownRequested = false;
     private shutdownPromise: Promise<void> | null = null;
-    private lastMessageTime = 0;
 
     constructor(settings: any, username = 'User') {
         this.botController = new BotController(settings);
-        this.conversation = new Conversation(this.botController);
+        this.conversationChain = new ConversationChain();
+        this.conversationChain.addConversation(new Conversation(this.botController));
         this.username = username;
-        this.new_conversation_delay =
-            this.conversation.botController.settings.chat_process_delay_ms * 2;
+        this.new_conversation_delay = this.botController.settings.chat_process_delay_ms * 2;
     }
 
     async startup() {
+        await this.botController.init();
         this.shutdownRequested = false;
         this.shutdownPromise = this.startWorker();
-        this.conversation.on(ConversationEvents.Updated, this.onConversationUpdated.bind(this));
-        await this.botController.init();
+        this.conversationChain.on(
+            ConversationChainEvents.Updated,
+            this.onConversationUpdated.bind(this)
+        );
     }
 
     async shutdown() {
@@ -40,51 +43,54 @@ export class STTTSClient implements BotClient {
         if (messages.length > 0) {
             this.conversationSequence = messages.at(-1)?.sequence;
         }
-        let chat = false;
         for (const message of messages) {
             switch (message.role) {
                 case 'user': {
                     if (message.sender != this.username) {
                         console.log(`${message.sender}: ${message.content}`);
                     }
-                    chat = true;
                     break;
                 }
                 case 'assistant':
                     console.log(`${message.sender}: ${message.content}`);
                     await this.botController.speech.speak(message.content);
                     break;
-                case 'system':
+                default:
                     console.log(`${message.sender}: ${message.content}`);
                     break;
             }
-        }
-        if (chat) {
-            await this.botController.chat(conversation).catch(error => console.error(error));
         }
     }
 
     private async startWorker(): Promise<void> {
         console.log('Client startup complete.');
         try {
+            let lastMessageTime = 0;
             while (!this.shutdownRequested) {
                 // Listen for new messages
-                const now = Date.now();
-                const useTriggerWord = now - this.lastMessageTime > this.new_conversation_delay;
-                const triggerWord = useTriggerWord
-                    ? this.conversation.botController.settings.bot_name
-                    : null;
-                const message = await this.botController.speech.listen(
+                const useTriggerWord = Date.now() - lastMessageTime > this.new_conversation_delay;
+                const triggerWord = useTriggerWord ? this.botController.settings.bot_name : null;
+                const messageContent = await this.botController.speech.listen(
                     triggerWord,
                     this.new_conversation_delay
                 );
-                if (message.length <= 0) {
+                lastMessageTime = Date.now();
+                if (messageContent.length <= 0) {
                     continue;
                 }
-                console.info(`${this.username}: ${message}`);
 
-                // Add new message to conversation
-                this.conversation.push(new ConvMessage('user', this.username, message));
+                const message = new ConvMessage('user', this.username, messageContent);
+                console.info(`${message.sender}: ${message.content}`);
+
+                // push to conversation chain
+                this.conversationChain.push(message).then(async conversation => {
+                    // trigger chat if nobody is chatting
+                    if (!this.conversationChain.chatting) {
+                        await this.conversationChain
+                            .chat(conversation)
+                            .catch(error => console.error(error));
+                    }
+                });
             }
         } catch (error) {
             console.error(error);
