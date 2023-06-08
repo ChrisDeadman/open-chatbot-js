@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { PromptTemplate } from 'langchain/prompts';
+import { CommandApi } from '../bot_api/command_api.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { BotController } from './bot_controller.js';
 import { ConvMessage } from './conv_message.js';
@@ -116,7 +117,7 @@ export class Conversation extends EventEmitter {
             // parse tools
             const toolsTemplate = new PromptTemplate({
                 inputVariables: [...Object.keys(this.botController.settings), 'now'],
-                template: this.botController.settings.prompt_templates.tools.join('\n'),
+                template: CommandApi.commandDoc,
             });
             const tools = await toolsTemplate.format({
                 ...this.botController.settings,

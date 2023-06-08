@@ -165,7 +165,7 @@ export class BotController {
                         .handleRequest(
                             cmd,
                             conversation.memoryContext,
-                            conversation.botController.settings.language
+                            conversation.botController.settings
                         )
                         .then(result => {
                             if (result.length > 0) {

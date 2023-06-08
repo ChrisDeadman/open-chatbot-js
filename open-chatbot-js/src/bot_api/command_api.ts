@@ -1,9 +1,11 @@
-import axios from 'axios';
 import { MemoryProvider } from '../memory/memory_provider.js';
 import { BotModel } from '../models/bot_model.js';
-import { settings } from '../settings.js';
-import { commandToString, extractURLs } from '../utils/parsing_utils.js';
 import { BotBrowser } from './bot_browser.js';
+import { browseWebsite, browseWebsiteDoc } from './commands/browse_website.js';
+import { deleteMemory, deleteMemoryDoc } from './commands/delete_memory.js';
+import { exit, exitDoc } from './commands/exit.js';
+import { python, pythonDoc } from './commands/python.js';
+import { storeMemory, storeMemoryDoc } from './commands/store_memory.js';
 
 export enum Command {
     StoreMemory = 'storeMemory',
@@ -13,93 +15,63 @@ export enum Command {
     Exit = 'exit',
 }
 
-export class CommandApi {
+export type CommandContext = {
     botModel: BotModel;
+    memory?: MemoryProvider;
     botBrowser?: BotBrowser;
-    memory: MemoryProvider | undefined;
+};
+
+export class CommandApi {
+    private context: CommandContext;
+
+    private commandMap: Record<
+        string,
+        (
+            commandArgs: Record<string, string>,
+            commandContext: CommandContext,
+            settings: any,
+            memContext: string
+        ) => Promise<string>
+    > = {
+        [Command.StoreMemory]: storeMemory,
+        [Command.DeleteMemory]: deleteMemory,
+        [Command.BrowseWebsite]: browseWebsite,
+        [Command.Python]: python,
+        [Command.Exit]: exit,
+    };
 
     constructor(botModel: BotModel, memory?: MemoryProvider, botBrowser?: BotBrowser) {
-        this.botModel = botModel;
-        this.memory = memory;
-        this.botBrowser = botBrowser;
+        this.context = { botModel, memory, botBrowser };
+    }
+
+    static get commandDoc(): string {
+        const docs = {
+            'Store Memory': storeMemoryDoc,
+            'Delete Memory': deleteMemoryDoc,
+            'Browse Website': browseWebsiteDoc,
+            'Python Code Execution': pythonDoc,
+            'Exit Conversation': exitDoc,
+        };
+        return Object.entries(docs)
+            .map(([k, v]) =>
+                [`**${k}**`, `${v.summary}`, `Syntax: ${v.syntax}`].join('\n')
+            )
+            .join('\n\n');
     }
 
     async handleRequest(
         commandArgs: Record<string, string>,
         memContext: string,
-        language: string
+        settings: any
     ): Promise<string> {
         let response = '';
 
-        const commandContent = commandToString(commandArgs, true).trim();
-
         try {
-            switch (commandArgs.command) {
-                case Command.StoreMemory: {
-                    if (this.memory && commandContent.length > 0 && memContext.length > 0) {
-                        await this.memory.add(memContext, commandContent);
-                    }
-                    break;
-                }
-                case Command.DeleteMemory: {
-                    if (this.memory && commandContent.length > 0 && memContext.length > 0) {
-                        await this.memory.del(memContext, commandContent);
-                    }
-                    break;
-                }
-                case Command.BrowseWebsite: {
-                    if (this.botBrowser) {
-                        let url = commandArgs.url;
-                        let question = commandArgs.question;
-
-                        if (url === undefined) {
-                            const urls = extractURLs(commandContent);
-                            if (urls.length > 0) {
-                                url = urls[0];
-                            }
-                        }
-
-                        if (question === undefined) {
-                            question = commandContent;
-                        }
-
-                        if (url === undefined) {
-                            response = 'ERROR: no URL provided';
-                        } else if (question.length <= url.length) {
-                            response = 'ERROR: no question provided';
-                        } else {
-                            const pageData = await this.botBrowser.getPageData(
-                                url,
-                                question,
-                                language
-                            );
-                            response = pageData.summary;
-                        }
-                    } else {
-                        response = 'ERROR: browser is broken.';
-                    }
-                    break;
-                }
-                case Command.Python: {
-                    if (commandContent.length > 0) {
-                        const url = `http://${settings.python_executor_host}:${settings.python_executor_port}/execute`;
-                        const config = {
-                            headers: {
-                                'Content-Type': 'text/plain',
-                            },
-                            timeout: settings.browser_timeout,
-                        };
-                        const completion = await axios.post(url, commandContent, config);
-                        response = String(completion.data);
-                    }
-                    break;
-                }
-                case Command.Exit:
-                    break;
-                default: {
-                    response = 'Invalid command.';
-                    break;
-                }
+            const commandHandler = this.commandMap[commandArgs.command];
+            if (commandHandler != null) {
+                response = await commandHandler(commandArgs, this.context, settings, memContext);
+            } else {
+                response = 'Invalid command.';
             }
         } catch (error) {
             response = `"${error}.`;
