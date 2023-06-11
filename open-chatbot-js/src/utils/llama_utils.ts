@@ -31,13 +31,9 @@ export function filterResponse(response: string, stoppingStrings: string[]): str
         'gi'
     );
     const filtered = response
-        .replace(/^\s*[`]+\s*$/, '')
-        .replaceAll('\\\\_', '_')
-        .replaceAll('\\_', '_')
-        .replaceAll('\\*', '*')
-        .replaceAll('​', ' ')
-        .replaceAll(/(?<=\p{Extended_Pictographic})\p{Extended_Pictographic}{3,}/gu, '') // Prevent emoji flood
-        .replaceAll(new RegExp(`(.)\\1{${5},}`, 'g'), (_match, char) => char.repeat(5)) // Don't repeat any character more than 5 times
+        .replaceAll(/\u200B/g, ' ') // zero width space
+        .replaceAll(/\u00A0/g, ' ') // non-breaking space
+        .replaceAll(/(?<=\p{Extended_Pictographic})\p{Extended_Pictographic}{5,}/gu, '') // prevent emoji flood
         .replace(removeAfterStop, '')
         .replace(removeTrailingStop, '')
         .trim();
