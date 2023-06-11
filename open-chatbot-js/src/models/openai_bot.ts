@@ -53,6 +53,11 @@ export class OpenAIBot implements BotModel, TokenModel, EmbeddingModel {
         return '';
     }
 
+    async countTokens(prompt: string): Promise<number> {
+        const tokens = await this.tokenize(prompt);
+        return tokens.length;
+    }
+
     async createEmbedding(content: string): Promise<number[]> {
         if (content.length <= 0) {
             return [];

@@ -38,7 +38,8 @@ export class WebUIBot implements BotModel {
                     top_p: conversation.botController.settings.bot_backend.top_p,
                     top_k: conversation.botController.settings.bot_backend.top_k,
                     typical_p: conversation.botController.settings.bot_backend.typical_p,
-                    repetition_penalty: conversation.botController.settings.bot_backend.repetition_penalty,
+                    repetition_penalty:
+                        conversation.botController.settings.bot_backend.repetition_penalty,
                     max_new_tokens: conversation.botController.settings.bot_backend.max_new_tokens,
                     truncation_length: this.maxTokens,
                 },
@@ -59,5 +60,24 @@ export class WebUIBot implements BotModel {
             console.error(`WebUI: ${error}`);
         }
         return '';
+    }
+
+    async countTokens(prompt: string): Promise<number> {
+        try {
+            const completion = await axios.post(
+                `${this.endpoint}/token-count`,
+                {
+                    prompt,
+                },
+                {
+                    timeout: 5000,
+                }
+            );
+            const numTokens = completion.data.results[0].tokens;
+            return numTokens;
+        } catch (error) {
+            console.error(`WebUI: ${error}`);
+        }
+        return 0;
     }
 }

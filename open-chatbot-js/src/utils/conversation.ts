@@ -268,8 +268,8 @@ export class Conversation extends EventEmitter {
         while (truncated.length > 0) {
             // as long as there are enough tokens remaining for the response
             const prompt = await this.getPromptString([...target, ...truncated], includesPrefix);
-            const tokens = await this.botController.tokenModel.tokenize(prompt);
-            if (tokens.length <= limit) {
+            const numTokens = await this.botController.botModel.countTokens(prompt);
+            if (numTokens <= limit) {
                 target.push(...truncated);
                 return prompt;
             }

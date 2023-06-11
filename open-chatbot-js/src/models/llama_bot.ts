@@ -72,4 +72,14 @@ export class LlamaBot implements BotModel {
         }
         return '';
     }
+
+    async countTokens(prompt: string): Promise<number> {
+        try {
+            const tokens = await this.llm.tokenize(prompt);
+            return tokens.length;
+        } catch (error) {
+            console.error(`Llama: ${error}`);
+        }
+        return 0;
+    }
 }
