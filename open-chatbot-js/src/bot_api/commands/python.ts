@@ -4,13 +4,8 @@ import { CommandContext } from '../command_api.js';
 
 export const pythonDoc = {
     summary:
-        'Executes non-blocking python code. Do not execute blocking functions like reading from stdin or endless loops.',
-    syntax: [
-        '```python',
-        'import os # Remember to include necessary imports',
-        "print('Hello, World!') # Your Python code here",
-        '```',
-    ].join('\n'),
+        'All python code with below syntax is directly interpreted and executed; reading from stdin or endless loops are prohibited.',
+    syntax: ['```python', 'import os', "print('Hello, World!')", '```'].join('\n'),
 };
 
 export async function python(
