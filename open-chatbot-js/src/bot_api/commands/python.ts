@@ -1,6 +1,6 @@
 import axios from 'axios';
+import { settings } from '../../settings.js';
 import { commandToString } from '../../utils/parsing_utils.js';
-import { CommandContext } from '../command_api.js';
 
 export const pythonDoc = {
     summary:
@@ -8,11 +8,7 @@ export const pythonDoc = {
     syntax: ['```python', 'import os', "print('Hello, World!')", '```'].join('\n'),
 };
 
-export async function python(
-    commandArgs: Record<string, string>,
-    _commandContext: CommandContext,
-    settings: any
-): Promise<string> {
+export async function python(commandArgs: Record<string, string>): Promise<string> {
     let response = '';
     const commandContent = commandToString(commandArgs, true).trim();
 

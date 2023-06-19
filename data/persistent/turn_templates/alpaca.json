@@ -1,0 +1,8 @@
+{
+  "user": "### Instruction:",
+  "bot": "### Response:",
+  "bot_message": "{name}:",
+  "turn_template": "{user}\n{user_message}\n\n{bot}\n{bot_message}\n\n",
+  "prefix": "Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n",
+  "command": "\nContinue the dialogue below as \"{name}\".\n"
+}

@@ -1,16 +1,22 @@
-const username = document.getElementById("username");
-const botname = document.getElementById("bot_name");
 const messages = document.getElementById("messages");
-const settingsModal = document.getElementById("settingsModal");
-const settingsForm = document.getElementById("settingsForm");
-const promptModal = document.getElementById("promptModal");
-const promptForm = document.getElementById("promptForm");
 const messageForm = document.getElementById("messageForm");
+const usernameInput = document.getElementById("usernameInput");
 const userInput = document.getElementById("userInput");
 const resetButton = document.getElementById("resetButton");
+const addBotButton = document.getElementById("addBotButton");
 const botList = document.getElementById("botList");
-const addBotDropDown = document.getElementById("addBotDropDown");
-const addBotDropdownMenuLink = document.getElementById("addBotDropdownMenuLink");
+
+const settingsModal = document.getElementById("settingsModal");
+const settingsForm = document.getElementById("settingsForm");
+
+const addBotModal = document.getElementById("addBotModal");
+const addBotForm = document.getElementById("addBotForm");
+const backendDropdown = document.getElementById("backendDropdown");
+const backendDropdownButton = document.getElementById("backendDropdownButton");
+const turnTemplateDropdown = document.getElementById("turnTemplateDropdown");
+const turnTemplateDropdownButton = document.getElementById("turnTemplateDropdownButton");
+const characterDropdown = document.getElementById("characterDropdown");
+const characterDropdownButton = document.getElementById("characterDropdownButton");
 
 // Initialize connection to backend
 const socket = io();
@@ -56,9 +62,7 @@ settingsModal.addEventListener("hide.bs.modal", () => {
 
 settingsForm.addEventListener("submit", function (e) {
   e.preventDefault();
-  socket.emit("update settings", formToJson(settingsForm));
-  // reset display values to match sliders
-  Array.from(document.querySelectorAll('input[type="range"]')).forEach(updateDisplayField);
+  socket.emit("update bot", formToJson(settingsForm));
 });
 
 // Add event listener to update slider display values
@@ -78,21 +82,10 @@ function updateDisplayField(target) {
   }
 }
 
-promptModal.addEventListener("hide.bs.modal", () => {
-  promptForm.dispatchEvent(new Event("submit"));
-});
-
-promptForm.addEventListener("submit", function (e) {
-  e.preventDefault();
-  socket.emit("update settings", formToJson(promptForm));
-});
-
 messageForm.addEventListener("submit", function (e) {
   e.preventDefault();
   if (userInput.innerText) {
-    const bgStyle = messages.children.length % 2 == 0 ? "bg-secondary" : "bg-primary";
-
-    socket.emit("chat message", username.value, userInput.innerText);
+    socket.emit("chat message", usernameInput.value, userInput.innerText);
     userInput.innerText = "";
   }
 });
@@ -109,55 +102,76 @@ resetButton.addEventListener("click", function (e) {
   socket.emit("reset");
 });
 
-// Emit 'readFiles' event when 'add bot' button is clicked
-addBotDropdownMenuLink.addEventListener("click", () => {
-  socket.emit("list files");
+usernameInput.addEventListener("blur", function (e) {
+  e.preventDefault();
+  socket.emit("update username", usernameInput.value);
 });
 
-// Attach the event listener for all delete bot buttons
+addBotButton.addEventListener("click", () => {
+  socket.emit("new bot");
+});
+
+addBotForm.addEventListener("submit", function (e) {
+  e.preventDefault();
+  socket.emit("add bot", {
+    backend: backendDropdownButton.textContent,
+    turnTemplate: turnTemplateDropdownButton.textContent,
+    character: characterDropdownButton.textContent,
+  });
+});
+
 document.addEventListener("click", (event) => {
-  // Check if the clicked element is a delete bot button
-  if (event.target.matches(".delete-bot") || event.target.parentElement.matches(".delete-bot")) {
+  // Attach the event listener for all delete bot buttons
+  if (event.target.matches(".delete-bot") || event.target.parentElement?.matches(".delete-bot")) {
     const targetBtn = event.target.matches(".delete-bot")
       ? event.target
       : event.target.parentElement;
 
-    const botElement = targetBtn.closest(".d-flex");
-    const botName = botElement.querySelector("label").innerText;
+    const botElement = targetBtn.closest(".bot-element");
+    const botName = botElement.querySelector(".badge").innerText;
 
     // Emit the delete bot event
     socket.emit("delete bot", botName);
+    return;
+  }
+
+  // Attach the event listener for all edit bot buttons
+  if (event.target.matches(".edit-bot") || event.target.parentElement?.matches(".edit-bot")) {
+    const targetBtn = event.target.matches(".edit-bot") ? event.target : event.target.parentElement;
+
+    const botElement = targetBtn.closest(".bot-element");
+    const botName = botElement.querySelector(".badge").innerText;
+
+    // Emit the edit bot event
+    socket.emit("edit bot", botName);
+    return;
   }
 });
 
-// Listen for 'files' event to receive .json files
-socket.on("files", (fileList) => {
-  // Select dropdown menu
-  const dropdownMenu = document.querySelector(".dropdown-menu");
-
-  // Remove existing dropdown items
-  while (dropdownMenu.firstChild) {
-    dropdownMenu.firstChild.remove();
-  }
-
-  fileList
-    .filter((f) => f.endsWith(".json"))
-    .forEach((file) => {
-      // Create dropdown item
-      const dropdownItem = document.createElement("a");
-      dropdownItem.classList.add("dropdown-item");
-      dropdownItem.href = "#";
-      dropdownItem.textContent = file;
-
-      // When a file is selected from dropdown, emit 'createBot' event
-      dropdownItem.addEventListener("click", (event) => {
-        event.preventDefault();
-        socket.emit("create bot", event.target.textContent);
+// Listen for new bot event to receive .json files
+socket.on("new bot", (files) => {
+  const updateDropdown = (dd, ddButton, options) => {
+    dd.innerHTML = "";
+    options.forEach((option) => {
+      let listItem = document.createElement("li");
+      let anchor = document.createElement("a");
+      anchor.classList.add("dropdown-item");
+      anchor.href = "#";
+      anchor.innerHTML = option;
+      anchor.addEventListener("click", function () {
+        ddButton.textContent = option;
       });
-
-      // Append dropdown item to dropdown menu
-      dropdownMenu.appendChild(dropdownItem);
+      listItem.appendChild(anchor);
+      dd.appendChild(listItem);
     });
+  };
+
+  updateDropdown(backendDropdown, backendDropdownButton, files.backends);
+  updateDropdown(turnTemplateDropdown, turnTemplateDropdownButton, files.turnTemplates);
+  updateDropdown(characterDropdown, characterDropdownButton, files.characters);
+
+  // Show the modal
+  new bootstrap.Modal(addBotModal).show();
 });
 
 // Listen for 'reset' event to clear conversation
@@ -167,8 +181,8 @@ socket.on("reset", () => {
   }
 });
 
-// Listen for 'new bot' event to receive new bot name
-socket.on("new bot", (botName) => {
+// Listen for 'add bot' event
+socket.on("add bot", (botName) => {
   // Skip if the bot element already exists
   const id = getBotElementId(botName);
   if (document.getElementById(getBotElementId(botName))) {
@@ -179,41 +193,69 @@ socket.on("new bot", (botName) => {
   const botElement = document.createElement("div");
   botElement.id = id;
   botElement.classList.add(
+    "nav-item",
+    "h4",
+    "bot-element",
+    "bg-success",
+    "position-relative",
     "d-flex",
     "rounded",
     "border",
     "flex-row",
     "flex-grow-0",
-    "align-items-start",
-    "bg-success",
+    "align-items-center",
     "bg-opacity-25",
     "mx-1",
-    "px-1"
+    "my-0"
   );
 
-  // Create label with bot name
-  const botLabel = document.createElement("label");
-  botLabel.classList.add("px-1", "flex-grow-1", "align-self-center");
-  botLabel.textContent = botName;
+  // Create settings button (hidden by default)
+  const settingsButton = document.createElement("button");
+  settingsButton.classList.add(
+    "btn",
+    "btn-warning",
+    "edit-bot",
+    "position-absolute",
+    "start-0",
+    "invisible"
+  );
+  const cogIcon = document.createElement("i");
+  cogIcon.classList.add("fa-solid", "fa-cog", "p-0");
+  settingsButton.appendChild(cogIcon);
+  botElement.appendChild(settingsButton);
+
+  // Create bot name label
+  const botLabel = document.createElement("span");
+  botLabel.classList.add("badge", "flex-grow-1");
+  botLabel.innerText = botName;
   botElement.appendChild(botLabel);
 
-  // Create delete bot button
-  if (botList.childElementCount > 1) {
-    const buttonDiv = document.createElement("div");
-    buttonDiv.classList.add("input-group-append", "align-self-start");
-    botElement.appendChild(buttonDiv);
-
-    const deleteButton = document.createElement("button");
-    deleteButton.style.fontSize = "10px";
-    deleteButton.classList.add("btn", "btn-danger", "btn-sm", "delete-bot", "p-0", "px-1");
-    buttonDiv.appendChild(deleteButton);
-
-    const deleteIcon = document.createElement("i");
-    deleteIcon.classList.add("fa-solid", "fa-x");
-    deleteButton.appendChild(deleteIcon);
-  }
+  // Create delete button (hidden by default)
+  const deleteButton = document.createElement("button");
+  deleteButton.classList.add(
+    "btn",
+    "btn-danger",
+    "delete-bot",
+    "position-absolute",
+    "end-0",
+    "invisible"
+  );
+  const deleteIcon = document.createElement("i");
+  deleteIcon.classList.add("fa-solid", "fa-x", "p-0");
+  deleteButton.appendChild(deleteIcon);
+  botElement.appendChild(deleteButton);
 
   botList.prepend(botElement);
+});
+
+// Listen for 'edit bot' event
+socket.on("edit bot", (settings) => {
+  // Fill the form
+  jsonToForm(settings, settingsForm);
+  // Set display values to match sliders
+  Array.from(document.querySelectorAll('input[type="range"]')).forEach(updateDisplayField);
+  // Show the modal
+  new bootstrap.Modal(settingsModal).show();
 });
 
 // Listen for 'delete bot' event to remove bot name
@@ -224,17 +266,14 @@ socket.on("delete bot", (botName) => {
 socket.on("chat message", function (sender, message) {
   var iconClass;
   switch (sender) {
-    case username.value:
+    case usernameInput.value:
       iconClass = "fa-user";
-      break;
-    case botname.value:
-      iconClass = "fa-robot";
       break;
     case "system":
       iconClass = "fa-wrench";
       break;
     default:
-      iconClass = "fa-user-secret";
+      iconClass = "fa-robot";
       break;
   }
 
@@ -427,8 +466,8 @@ function formToJson(form) {
         // Numbers are parsed as float
         value = parseFloat(el.value);
       } else {
-        // Strings stay as they are
-        value = el.value;
+        // String special chars are converted
+        value = String(el.value).replaceAll("\\r", "\r").replaceAll("\\n", "\n");
       }
 
       // Set the value at the deepest level
@@ -436,4 +475,50 @@ function formToJson(form) {
 
       return acc;
     }, {});
+}
+
+function jsonToForm(json, form) {
+  // Flatten the json object into a key-value pair where key is a string of nested keys
+  function flattenObj(obj, prefix = "", res = {}) {
+    for (const k in obj) {
+      const pre = prefix.length ? prefix + "." : "";
+      if (typeof obj[k] === "object" && !Array.isArray(obj[k])) flattenObj(obj[k], pre + k, res);
+      else res[pre + k] = obj[k];
+    }
+    return res;
+  }
+  const flatJson = flattenObj(json);
+
+  // Loop through all form elements
+  Array.from(form.elements).forEach((el) => {
+    if (!el.id) {
+      return;
+    }
+    // If element has an id and id exists in json
+    if (el.id in flatJson) {
+      if (el.tagName === "TEXTAREA") {
+        // If textarea, join the array elements into a string with '\n'
+        el.value = Array.isArray(flatJson[el.id]) ? flatJson[el.id].join("\n") : flatJson[el.id];
+      } else if (el.type === "number" || el.type === "range") {
+        // If number or range, parse the value to a float
+        el.value = parseFloat(flatJson[el.id]);
+      } else {
+        // String special chars are converted
+        el.value = String(flatJson[el.id]).replaceAll("\r", "\\r").replaceAll("\n", "\\n");
+      }
+      // make the element visible
+      const group = el.closest(".form-group");
+      if (group) {
+        group.style.display = "";
+      }
+    } else {
+      if (!el.id.endsWith("_display")) {
+        // hide the element if it does not exist in the json object
+        const group = el.closest(".form-group");
+        if (group) {
+          group.style.setProperty("display", "none", "important");
+        }
+      }
+    }
+  });
 }

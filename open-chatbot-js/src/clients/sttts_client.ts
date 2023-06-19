@@ -1,3 +1,4 @@
+import { settings } from '../settings.js';
 import { BotController } from '../utils/bot_controller.js';
 import { ConvMessage } from '../utils/conv_message.js';
 import { Conversation } from '../utils/conversation.js';
@@ -14,12 +15,12 @@ export class STTTSClient implements BotClient {
     private shutdownRequested = false;
     private shutdownPromise: Promise<void> | null = null;
 
-    constructor(settings: any, username = 'User') {
-        this.botController = new BotController(settings);
+    constructor(botController: BotController, username = 'User') {
+        this.botController = botController;
         this.conversationChain = new ConversationChain();
         this.conversationChain.addConversation(new Conversation(this.botController));
         this.username = username;
-        this.new_conversation_delay = this.botController.settings.chat_process_delay_ms * 2;
+        this.new_conversation_delay = settings.chat_process_delay_ms * 2;
     }
 
     async startup() {
@@ -69,7 +70,7 @@ export class STTTSClient implements BotClient {
             while (!this.shutdownRequested) {
                 // Listen for new messages
                 const useTriggerWord = Date.now() - lastMessageTime > this.new_conversation_delay;
-                const triggerWord = useTriggerWord ? this.botController.settings.bot_name : null;
+                const triggerWord = useTriggerWord ? this.botController.settings.name : null;
                 const messageContent = await this.botController.speech.listen(
                     triggerWord,
                     this.new_conversation_delay

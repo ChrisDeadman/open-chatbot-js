@@ -17,6 +17,7 @@ import { EmbeddingModel } from '../models/embedding_model.js';
 import { LlamaBot } from '../models/llama_bot.js';
 import { LlamaEmbedding } from '../models/llama_embedding.js';
 import { SbertEmbedding } from '../models/sbert_embedding.js';
+import { exceptionToString } from './conversion_utils.js';
 
 export class BotController {
     settings: any;
@@ -68,7 +69,7 @@ export class BotController {
             default: {
                 if (!fs.existsSync(this.settings.bot_backend.model)) {
                     throw new Error(
-                        `${this.settings.bot_backend.model} does not exist, please check this.settings.json.`
+                        `${this.settings.bot_backend.model} does not exist, please check backend settings.`
                     );
                 }
                 const llamaBot = new LlamaBot(
@@ -89,7 +90,7 @@ export class BotController {
             case 'llama': {
                 if (!fs.existsSync(this.settings.embedding_backend.model)) {
                     throw new Error(
-                        `${this.settings.embedding_backend.model} does not exist, please check this.settings.json.`
+                        `${this.settings.embedding_backend.model} does not exist, please check backend settings.`
                     );
                 }
                 const llamaEmbedding = new LlamaEmbedding(
@@ -118,7 +119,7 @@ export class BotController {
                 this.settings.memory_backend.redis_host,
                 this.settings.memory_backend.redis_port,
                 this.embeddingModel,
-                `idx:${this.settings.bot_name}:memory`
+                `idx:${this.settings.name}:memory`
             );
             await redisMemory.init();
             await redisMemory.clear(); // TODO: Clear always for now
@@ -146,7 +147,7 @@ export class BotController {
             // Parse bot response
             const responseData = this.parseResponse(
                 response,
-                conversation.botController.settings.bot_name
+                conversation.botController.settings.name
             );
 
             // Execute commands
@@ -185,7 +186,7 @@ export class BotController {
             // Build response message
             const message = new ConvMessage(
                 'assistant',
-                conversation.botController.settings.bot_name,
+                conversation.botController.settings.name,
                 responseData.message
             );
 
@@ -199,7 +200,7 @@ export class BotController {
             return message;
         } catch (error) {
             // Push the error response
-            const message = new ConvMessage('system', 'system', String(error));
+            const message = new ConvMessage('system', 'system', exceptionToString(error));
             conversation.push(message);
             return message;
         }

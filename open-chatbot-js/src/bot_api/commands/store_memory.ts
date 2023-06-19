@@ -14,7 +14,7 @@ export const storeMemoryDoc = {
 export async function storeMemory(
     commandArgs: Record<string, string>,
     commandContext: CommandContext,
-    _settings: any,
+    _botSettings: any,
     memContext: string
 ): Promise<string> {
     const commandContent = commandToString(commandArgs, true).trim();

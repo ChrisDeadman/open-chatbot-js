@@ -143,5 +143,10 @@ data/browser_extensions/*
 !data/browser_extensions/README.md
 !data/images/
 data/persistent/*
-!data/persistent/settings.example.*.json
+!data/persistent/turn_templates/
+!data/persistent/backends/
+data/persistent/backends/*
+!data/persistent/characters/
+data/persistent/characters/*
+!data/persistent/**/*.example*.json
 !data/web_client/

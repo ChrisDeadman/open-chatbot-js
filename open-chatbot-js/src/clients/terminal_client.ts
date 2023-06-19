@@ -13,8 +13,8 @@ export class TerminalClient implements BotClient {
     private username;
     private botController: BotController;
 
-    constructor(settings: any, username = 'User') {
-        this.botController = new BotController(settings);
+    constructor(botController: BotController, username = 'User') {
+        this.botController = botController;
         this.username = username;
         this.conversationChain = new ConversationChain();
         this.conversationChain.addConversation(new Conversation(this.botController));

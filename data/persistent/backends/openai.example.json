@@ -1,0 +1,19 @@
+{
+  "bot_backend": {
+    "name": "openai",
+    "model": "gpt-3.5-turbo",
+    "api_key": "YOUR_API_KEY",
+    "max_new_tokens": 512,
+    "token_limit": 4000,
+    "rate_limit_ms": 7500
+  },
+  "embedding_backend": {
+    "name": "openai",
+    "model": "text-embedding-ada-002"
+  },
+  "memory_backend": {
+    "name": "redis",
+    "redis_host": "localhost",
+    "redis_port": 6379
+  }
+}

@@ -29,7 +29,7 @@ export class CommandApi {
         (
             commandArgs: Record<string, string>,
             commandContext: CommandContext,
-            settings: any,
+            botSettings: any,
             memContext: string
         ) => Promise<string>
     > = {
@@ -62,14 +62,14 @@ export class CommandApi {
     async handleRequest(
         commandArgs: Record<string, string>,
         memContext: string,
-        settings: any
+        botSettings: any
     ): Promise<string> {
         let response = '';
 
         try {
             const commandHandler = this.commandMap[commandArgs.command];
             if (commandHandler != null) {
-                response = await commandHandler(commandArgs, this.context, settings, memContext);
+                response = await commandHandler(commandArgs, this.context, botSettings, memContext);
             } else {
                 response = 'Invalid command.';
             }

@@ -1,7 +1,24 @@
-p {
-  margin-bottom: 0;
-}
 .modal-dialog {
+  top: 15%;
+}
+.modal-dialog-large {
   top: 5%;
-  min-width: 66%;
+  min-width: 50%;
+}
+.bot-element {
+  transition: all 0.3s ease; /* Add transition for smooth width and padding changes */
+  justify-content: flex-end; /* Align text to the right */
+}
+.bot-element button {
+  padding-left: 0.5em;
+  padding-right: 0.5em;
+  padding-top: 0.1em;
+  padding-bottom: 0.1em;
+}
+.bot-element:hover {
+  padding-left: 1.35em; /* Add space on for the buttons on hover */
+  padding-right: 1.25em; /* Add space on for the buttons on hover */
+}
+.bot-element:hover button {
+  visibility: visible !important; /* Override "invisible" class on hover */
 }

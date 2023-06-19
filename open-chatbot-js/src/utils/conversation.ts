@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { PromptTemplate } from 'langchain/prompts';
 import { CommandApi } from '../bot_api/command_api.js';
+import { settings } from '../settings.js';
 import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { BotController } from './bot_controller.js';
 import { ConvMessage } from './conv_message.js';
@@ -14,7 +15,7 @@ export enum ConversationEvents {
 
 export class Conversation extends EventEmitter {
     private delayTimeout: NodeJS.Timeout | undefined;
-    private fixedPrompt: string | undefined;
+    private fixedContext: string | undefined;
     private updating = false;
 
     botController: BotController;
@@ -25,14 +26,14 @@ export class Conversation extends EventEmitter {
     constructor(
         botController: BotController,
         context: any = undefined,
-        fixedPrompt: string | undefined = undefined
+        fixedContext: string | undefined = undefined
     ) {
         super();
         this.botController = botController;
-        this.fixedPrompt = fixedPrompt;
+        this.fixedContext = fixedContext;
         this.context = context;
         this.memoryContext = '';
-        this.messageBuffer = new CyclicBuffer(this.botController.settings.message_history_size);
+        this.messageBuffer = new CyclicBuffer(settings.message_history_size);
     }
 
     clear() {
@@ -75,10 +76,7 @@ export class Conversation extends EventEmitter {
                 this.updating = false;
             }
         };
-        this.delayTimeout = setTimeout(
-            timeoutFunc,
-            this.botController.settings.chat_process_delay_ms
-        );
+        this.delayTimeout = setTimeout(timeoutFunc, settings.chat_process_delay_ms);
     }
 
     get messages(): ConvMessage[] {
@@ -107,12 +105,12 @@ export class Conversation extends EventEmitter {
     }
 
     async getPrompt(): Promise<ConvMessage[]> {
-        const prefix = [];
+        const context = [];
         const messages: ConvMessage[] = [];
 
-        // Use fixed prompt as prefix if defined
-        if (this.fixedPrompt != undefined) {
-            prefix.push(this.fixedPrompt);
+        // Use fixed context as context if defined
+        if (this.fixedContext != undefined) {
+            context.push(this.fixedContext);
         } else {
             // parse tools
             const toolsTemplate = new PromptTemplate({
@@ -121,19 +119,21 @@ export class Conversation extends EventEmitter {
             });
             const tools = await toolsTemplate.format({
                 ...this.botController.settings,
-                now: dateTimeToStr(new Date(), this.botController.settings.locale),
+                now: dateTimeToStr(new Date(), settings.locale),
             });
 
-            // parse prefix
-            const prefixTemplate = new PromptTemplate({
+            // parse context
+            const contextTemplate = new PromptTemplate({
                 inputVariables: [...Object.keys(this.botController.settings), 'tools', 'now'],
-                template: this.botController.settings.prompt_templates.prefix.join('\n'),
+                template:
+                    this.botController.settings.context.join('\n') +
+                    this.botController.settings.command,
             });
-            prefix.push(
-                await prefixTemplate.format({
+            context.push(
+                await contextTemplate.format({
                     ...this.botController.settings,
                     tools: tools,
-                    now: dateTimeToStr(new Date(), this.botController.settings.locale),
+                    now: dateTimeToStr(new Date(), settings.locale),
                 })
             );
 
@@ -142,20 +142,22 @@ export class Conversation extends EventEmitter {
                 // parse history
                 const historyTemplate = new PromptTemplate({
                     inputVariables: [...Object.keys(this.botController.settings), 'now'],
-                    template: this.botController.settings.prompt_templates.history.join('\n'),
+                    template: (this.botController.settings.history ?? []).join('\n'),
                 });
                 const history = await historyTemplate.format({
                     ...this.botController.settings,
-                    now: dateTimeToStr(new Date(), this.botController.settings.locale),
+                    now: dateTimeToStr(new Date(), settings.locale),
                 });
 
-                prefix.push(history);
+                if (history.length > 0) {
+                    context.push(history);
+                }
             }
         }
 
-        // append the prefix
+        // append the context
         await this.appendMessages(messages, [
-            new ConvMessage('system', 'system', prefix.join('\n')),
+            new ConvMessage('system', 'system', context.join('\n')),
         ]);
 
         if (this.botController.memory && this.memoryContext.length >= 0) {
@@ -184,55 +186,51 @@ export class Conversation extends EventEmitter {
         return messages;
     }
 
-    async getPromptString(messages: ConvMessage[], includesPrefix = true): Promise<string> {
-        const prompt: string[] = [];
+    async getPromptString(messages: ConvMessage[], includesContext = true): Promise<string> {
+        const userMessage: string[] = [];
 
-        const systemTemplate = new PromptTemplate({
-            inputVariables: ['role', 'sender', 'content'],
-            template: this.botController.settings.prompt_templates.system_message,
-        });
-        const userTemplate = new PromptTemplate({
-            inputVariables: ['role', 'sender', 'content'],
-            template: this.botController.settings.prompt_templates.user_message,
-        });
-        const assistantTemplate = new PromptTemplate({
-            inputVariables: ['role', 'sender', 'content'],
-            template: this.botController.settings.prompt_templates.assistant_message,
-        });
-        const suffixTemplate = new PromptTemplate({
-            inputVariables: [...Object.keys(this.botController.settings), 'now'],
-            template: this.botController.settings.prompt_templates.suffix.join('\n'),
+        const messageTemplate = new PromptTemplate({
+            inputVariables: ['sender', 'content'],
+            template: '{sender}: {content}',
         });
 
-        // Use prefix as is
-        if (includesPrefix) {
-            prompt.push(messages[0].content);
+        const turnTemplate = new PromptTemplate({
+            inputVariables: [
+                ...Object.keys(this.botController.settings),
+                'user_message',
+                'bot_message',
+            ],
+            template: this.botController.settings.turn_template.replace(/\s*(<\/s>)*\s*$/, ''),
+        });
+
+        // Extract context from messages if included
+        if (includesContext) {
+            userMessage.push(messages[0].content);
             messages = messages.slice(1);
         }
 
-        // Messages
+        // Add messages
         for (const m of messages) {
-            switch (m.role) {
-                case 'user':
-                    prompt.push(await userTemplate.format(m));
-                    break;
-                case 'assistant':
-                    prompt.push(await assistantTemplate.format(m));
-                    break;
-                default:
-                    prompt.push(await systemTemplate.format(m));
-                    break;
-            }
+            userMessage.push(await messageTemplate.format(m));
         }
 
-        // Suffix
-        const suffix = await suffixTemplate.format({
-            ...this.botController.settings,
-            now: dateTimeToStr(new Date(), this.botController.settings.locale),
+        // Parse bot_message parameter for turn template
+        const botMessageTemplate = new PromptTemplate({
+            inputVariables: Object.keys(this.botController.settings),
+            template: this.botController.settings.bot_message ?? '',
         });
-        prompt.push(suffix);
+        const botMessage = await botMessageTemplate.format(this.botController.settings);
 
-        return prompt.join('\n');
+        // Format according to turn template
+        const prompt =
+            (this.botController.settings.prefix ?? '') +
+            (await turnTemplate.format({
+                ...this.botController.settings,
+                user_message: userMessage.join('\n'),
+                bot_message: botMessage,
+            }));
+
+        return prompt;
     }
 
     // Update memory vector related to conversation context

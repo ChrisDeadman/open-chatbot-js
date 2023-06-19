@@ -1,24 +1,32 @@
 import { hideBin } from 'yargs/helpers';
 import yargs from 'yargs/yargs';
-import { loadSettings, settings } from './settings.js';
+import {
+    getBackendDir,
+    getCharacterDir,
+    getTurnTemplateDir,
+    loadSettings,
+    readCombineSettings,
+} from './settings.js';
 
+import path from 'path';
 import { BotClient } from './clients/bot_client.js';
 import { DiscordClient } from './clients/discord_client.js';
 import { STTTSClient } from './clients/sttts_client.js';
 import { TerminalClient } from './clients/terminal_client.js';
 import { WebClient } from './clients/web_client.js';
+import { BotController } from './utils/bot_controller.js';
 
-function createClient(clientId: string): BotClient {
-    const botSettings = JSON.parse(JSON.stringify(settings));
+function createClient(clientId: string, controllerSettings: any): BotClient {
+    const controller = new BotController(controllerSettings);
     switch (clientId) {
         case 'discord':
-            return new DiscordClient(botSettings);
+            return new DiscordClient(controller);
         case 'sttts':
-            return new STTTSClient(botSettings);
+            return new STTTSClient(controller);
         case 'web':
-            return new WebClient(botSettings);
+            return new WebClient();
         default:
-            return new TerminalClient(botSettings);
+            return new TerminalClient(controller);
     }
 }
 
@@ -28,11 +36,29 @@ const argv = await yargs(hideBin(process.argv))
     .command('sttts', 'start the bot in sttts mode')
     .command('discord', 'start the bot in discord mode')
     .demandCommand(1)
-    .option('settings', {
-        alias: 's',
+    .option('data', {
+        alias: 'd',
         type: 'string',
-        description: 'Path to the config file',
-        default: 'data/persistent/settings.json',
+        description: 'Path to the data directory containing settings.json',
+        default: 'data/persistent',
+    })
+    .option('backend', {
+        alias: 'b',
+        type: 'string',
+        description: 'Name of the backend json file',
+        default: 'webui.example.json',
+    })
+    .option('turn_template', {
+        alias: 't',
+        type: 'string',
+        description: 'Name of the turn-template json file',
+        default: 'alpaca.json',
+    })
+    .option('character', {
+        alias: 'c',
+        type: 'string',
+        description: 'Name of the character json file',
+        default: 'eva.example.json',
     })
     .parse();
 
@@ -40,10 +66,16 @@ const clientId = typeof argv._[0] === 'string' ? argv._[0] : 'terminal';
 
 console.log('Loading settings...');
 
-await loadSettings(argv.settings);
+await loadSettings(argv.data);
+
+const controllerSettings = await readCombineSettings(
+    path.join(getBackendDir(argv.data), argv.backend),
+    path.join(getTurnTemplateDir(argv.data), argv.turn_template),
+    path.join(getCharacterDir(argv.data), argv.character)
+);
 
 // Create the Bot client
-const botClient: BotClient = createClient(clientId);
+const botClient: BotClient = createClient(clientId, controllerSettings);
 
 // Normal exit
 process.on('beforeExit', async () => {

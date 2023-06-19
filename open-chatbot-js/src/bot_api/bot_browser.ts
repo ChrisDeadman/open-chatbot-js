@@ -1,9 +1,10 @@
 import { Browser, Page } from 'puppeteer';
 
 import { PromptTemplate } from 'langchain/prompts';
-import { Conversation } from '../utils/conversation.js';
-import { dateTimeToStr } from '../utils/conversion_utils.js';
+import { settings } from '../settings.js';
 import { BotController } from '../utils/bot_controller.js';
+import { Conversation } from '../utils/conversation.js';
+import { dateTimeToStr, exceptionToString } from '../utils/conversion_utils.js';
 
 class PageData {
     url: string;
@@ -64,7 +65,7 @@ export class BotBrowser {
                 'content',
                 'now',
             ],
-            template: this.botController.settings.prompt_templates.bot_browser.join('\n'),
+            template: settings.prompt_templates.bot_browser.join('\n'),
         });
 
         // Calculate size of page chunks
@@ -78,10 +79,8 @@ export class BotBrowser {
             .replace('http://', '')
             .replace('https://', '')
             .replace('file:///', '');
-        const url =
-            this.botController.settings.proxy_host != null
-                ? `http://${proto_url}`
-                : `https://${proto_url}`;
+
+        const url = settings.proxy_host != null ? `http://${proto_url}` : `https://${proto_url}`;
 
         try {
             // Loading the page and get the content
@@ -105,7 +104,7 @@ export class BotBrowser {
 
                 // Load page content
                 await page.goto(url, {
-                    timeout: this.botController.settings.browser_timeout,
+                    timeout: settings.browser_timeout,
                     waitUntil: 'domcontentloaded',
                 });
 
@@ -122,7 +121,7 @@ export class BotBrowser {
                     return selection != null ? selection.toString() : '';
                 });
             } catch (error) {
-                pageData.summary = String(error);
+                pageData.summary = exceptionToString(error);
                 pageData.done = true;
                 return;
             } finally {
@@ -160,7 +159,7 @@ export class BotBrowser {
                     summary: pageData.summary,
                     content: pageData.content.shift(),
                     language: language,
-                    now: dateTimeToStr(new Date(), this.botController.settings.locale),
+                    now: dateTimeToStr(new Date(), settings.locale),
                 });
 
                 // generate updated summary
@@ -172,7 +171,7 @@ export class BotBrowser {
             pageData.done = true;
             pageData.reload = pageData.summary.length <= 0;
         } catch (error) {
-            pageData.summary = String(error);
+            pageData.summary = exceptionToString(error);
             pageData.reload = true;
             pageData.done = true;
         }

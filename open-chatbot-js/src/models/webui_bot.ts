@@ -49,7 +49,7 @@ export class WebUIBot implements BotModel {
             );
             const response = String(completion.data.results[0].text);
 
-            // console.debug(`WebUI DEBUG:\n${prompt}${response}`);
+            console.debug(`WebUI DEBUG:\n${prompt}${response}`);
 
             const endTime = Date.now();
             const elapsedMs = endTime - startTime;

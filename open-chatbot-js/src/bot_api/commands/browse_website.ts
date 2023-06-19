@@ -9,7 +9,7 @@ export const browseWebsiteDoc = {
 export async function browseWebsite(
     commandArgs: Record<string, string>,
     commandContext: CommandContext,
-    settings: any
+    botSettings: any
 ): Promise<string> {
     let response = '';
     const commandContent = commandToString(commandArgs, true).trim();
@@ -37,7 +37,7 @@ export async function browseWebsite(
             const pageData = await commandContext.botBrowser.getPageData(
                 url,
                 question,
-                settings.language
+                botSettings.language
             );
             response = pageData.summary;
         }

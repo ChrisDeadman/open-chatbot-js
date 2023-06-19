@@ -4,11 +4,18 @@ import http from 'http';
 import path from 'node:path';
 
 import { Server, Socket } from 'socket.io';
-import { readSettings } from '../settings.js';
+import {
+    getBackendDir,
+    getCharacterDir,
+    getTurnTemplateDir,
+    readCombineSettings,
+    settings,
+} from '../settings.js';
 import { BotController } from '../utils/bot_controller.js';
 import { ConvMessage } from '../utils/conv_message.js';
 import { Conversation } from '../utils/conversation.js';
 import { ConversationChain, ConversationChainEvents } from '../utils/conversation_chain.js';
+import { exceptionToString } from '../utils/conversion_utils.js';
 import { BotClient } from './bot_client.js';
 
 export class WebClient implements BotClient {
@@ -16,7 +23,6 @@ export class WebClient implements BotClient {
     private server: http.Server;
     private io: Server;
 
-    private mainController: BotController;
     private conversationChain: ConversationChain;
     private conversationSequence: number | undefined;
 
@@ -24,25 +30,15 @@ export class WebClient implements BotClient {
 
     private username;
 
-    constructor(settings: any, username = 'User') {
+    constructor(username = 'User') {
         this.username = username;
-        this.mainController = new BotController(settings);
-        const conversation = new Conversation(this.mainController);
         this.conversationChain = new ConversationChain();
-        this.conversationChain.addConversation(conversation);
-        this.bots[settings.bot_name] = {
-            conversation: conversation,
-            controller: this.mainController,
-        };
-
         this.app = express();
         this.server = http.createServer(this.app);
         this.io = new Server(this.server);
     }
 
     async startup() {
-        await this.mainController.init();
-
         const webDataPath = path.join('data', 'web_client');
         this.app.use(express.static(webDataPath)); // contains frontend HTML, JS, CSS files
 
@@ -52,37 +48,36 @@ export class WebClient implements BotClient {
         this.app.get('/', (_req, res) => {
             res.render('index', {
                 username: this.username,
-                settings: this.mainController.settings,
+                settings: settings,
             });
         });
 
         this.io.on('connection', socket => {
             socket.on('ready', () => this.onReady(socket));
-            socket.on('chat message', this.onChatMessage.bind(this));
             socket.on('reset', this.onReset.bind(this));
-            socket.on('update settings', this.onUpdateSettings.bind(this));
-            socket.on('create bot', this.onCreateBot.bind(this));
+            socket.on('chat message', this.onChatMessage.bind(this));
+            socket.on('update username', this.onUpdateUsername.bind(this));
+            socket.on('new bot', () => this.onNewBot(socket));
+            socket.on('add bot', this.onAddBot.bind(this));
+            socket.on('edit bot', name => this.onEditBot(socket, name));
+            socket.on('update bot', this.onUpdateBot.bind(this));
             socket.on('delete bot', this.onDeleteBot.bind(this));
-            socket.on('list files', () => {
-                socket.emit('files', this.listFiles());
-            });
         });
 
-        this.server.listen(
-            this.mainController.settings.web_server_port,
-            this.mainController.settings.web_server_host,
-            () => {
-                console.log(
-                    `web-client listening on http://${this.mainController.settings.web_server_host}:${this.mainController.settings.web_server_port}`
-                );
-            }
-        );
+        this.server.listen(settings.web_server_port, settings.web_server_host, () => {
+            console.log(
+                `web-client listening on http://${settings.web_server_host}:${settings.web_server_port}`
+            );
+        });
 
         this.conversationChain.on(
             ConversationChainEvents.Updated,
             this.onConversationUpdated.bind(this)
         );
         this.conversationChain.on(ConversationChainEvents.Chatting, this.onChatting.bind(this));
+        this.conversationChain.on(ConversationChainEvents.ChatComplete, () =>
+            this.io.emit('stop typing')
+        );
 
         console.log('Client startup complete.');
     }
@@ -95,15 +90,26 @@ export class WebClient implements BotClient {
     private onReady(socket: Socket) {
         // Load the bots
         for (const botName of Object.keys(this.bots)) {
-            socket.emit('new bot', botName);
+            socket.emit('add bot', botName);
         }
         // Load the conversation
-        for (const message of this.conversationChain.conversations[0].messages) {
+        const conversations = this.conversationChain.conversations;
+        for (const message of conversations.at(0)?.messages ?? []) {
             socket.emit('chat message', message.sender, message.content);
         }
     }
 
+    private onReset() {
+        console.info('Client: Conversation reset()');
+        this.conversationSequence = undefined;
+        this.conversationChain.clear();
+        this.io.emit('reset');
+    }
+
     private onChatMessage(sender: string, content: string) {
+        if (Object.keys(this.bots).length <= 0) {
+            return;
+        }
         try {
             content = content.trimStart();
             if (content.length > 0) {
@@ -125,24 +131,8 @@ export class WebClient implements BotClient {
         }
     }
 
-    private onReset() {
-        console.info('Client: Conversation reset()');
-        this.conversationSequence = undefined;
-        this.conversationChain.clear();
-        this.io.emit('reset');
-    }
-
-    private onUpdateSettings(settings: any) {
-        for (const [key, value] of Object.entries(settings)) {
-            this.mainController.settings[key] = value;
-            if (key === 'username') {
-                this.username = String(value);
-            }
-        }
-    }
-
     private onChatting(conversation: Conversation) {
-        this.io.emit('typing', `${conversation.botController.settings.bot_name} is typing`);
+        this.io.emit('typing', `${conversation.botController.settings.name} is typing`);
     }
 
     private onConversationUpdated(conversation: Conversation) {
@@ -159,10 +149,6 @@ export class WebClient implements BotClient {
                     break;
                 }
                 case 'assistant':
-                    this.io.emit(
-                        'stop typing',
-                        `${conversation.botController.settings.bot_name} stopped typing.`
-                    );
                     this.io.emit('chat message', message.sender, message.content);
                     break;
                 default:
@@ -172,24 +158,52 @@ export class WebClient implements BotClient {
         }
     }
 
-    private async onCreateBot(settingsFile: string) {
+    private onUpdateUsername(username: string) {
+        this.username = username;
+    }
+
+    private onNewBot(socket: Socket) {
+        const backendDir = getBackendDir(settings.dataDir);
+        const turnTemplateDir = getTurnTemplateDir(settings.dataDir);
+        const characterDir = getCharacterDir(settings.dataDir);
+
+        const getFiles = (dir: string) =>
+            fs
+                .readdirSync(dir)
+                .filter(f => fs.statSync(path.join(dir, f)).isFile())
+                .map(f => path.relative(dir, path.join(dir, f)));
+
+        socket.emit('new bot', {
+            backends: getFiles(backendDir),
+            turnTemplates: getFiles(turnTemplateDir),
+            characters: getFiles(characterDir),
+        });
+    }
+
+    private async onAddBot(config: any) {
         try {
-            const settings = await readSettings(`data/persistent/${settingsFile}`);
+            const controllerSettings = await readCombineSettings(
+                path.join(getBackendDir(settings.dataDir), config.backend),
+                path.join(getTurnTemplateDir(settings.dataDir), config.turnTemplate),
+                path.join(getCharacterDir(settings.dataDir), config.character)
+            );
 
             // Do not add the same bot twice
-            if (Object.keys(this.bots).includes(settings.bot_name)) {
+            if (Object.keys(this.bots).includes(controllerSettings.name)) {
                 return;
             }
 
-            const controller = new BotController(settings);
+            const controller = new BotController(controllerSettings);
             const conversation = new Conversation(controller);
 
             // reuse existing controller models if possible
             let compatibleController: BotController | undefined;
             for (const bot of Object.values(this.bots)) {
                 if (
-                    bot.controller.settings.bot_backend.name === settings.bot_backend.name &&
-                    bot.controller.settings.bot_backend.model === settings.bot_backend.model
+                    bot.controller.settings.bot_backend.name ===
+                        controllerSettings.bot_backend.name &&
+                    bot.controller.settings.bot_backend.model ===
+                        controllerSettings.bot_backend.model
                 ) {
                     compatibleController = bot.controller;
                     break;
@@ -198,33 +212,51 @@ export class WebClient implements BotClient {
             await controller.init(compatibleController);
 
             this.conversationChain.addConversation(conversation);
-            this.bots[settings.bot_name] = { conversation, controller };
-            this.io.emit('new bot', settings.bot_name);
+            this.bots[controllerSettings.name] = { conversation, controller };
+            this.io.emit('add bot', controllerSettings.name);
         } catch (ex) {
-            this.io.emit('chat message', 'system', ex);
+            this.io.emit('chat message', 'system', exceptionToString(ex));
         }
+    }
+
+    private onEditBot(socket: Socket, name: string) {
+        const bot = this.bots[name];
+        if (bot === undefined) {
+            return;
+        }
+        socket.emit('edit bot', bot.controller.settings);
+    }
+
+    private onUpdateBot(controllerSettings: any) {
+        const bot = this.bots[controllerSettings.name];
+        if (bot === undefined) {
+            return;
+        }
+        const setProperties = (src: any, target: any) => {
+            for (const [key, value] of Object.entries(src)) {
+                if (key in target) {
+                    if (typeof value === 'object' && !Array.isArray(value)) {
+                        setProperties(value, target[key]);
+                    } else {
+                        target[key] = value;
+                    }
+                }
+            }
+        };
+        setProperties(controllerSettings, bot.controller.settings);
     }
 
     private onDeleteBot(botName: string) {
         try {
             const bot = this.bots[botName];
+            if (bot === undefined) {
+                return;
+            }
             this.conversationChain.removeConversation(bot.conversation);
             delete this.bots[botName];
             this.io.emit('delete bot', botName);
         } catch (ex) {
-            this.io.emit('chat message', 'system', ex);
+            this.io.emit('chat message', 'system', exceptionToString(ex));
         }
-    }
-
-    private listFiles(dir = 'data/persistent/', filelist: string[] = []): string[] {
-        const files = fs.readdirSync(dir);
-        files.forEach(file => {
-            if (fs.statSync(path.join(dir, file)).isDirectory()) {
-                filelist = this.listFiles(path.join(dir, file), filelist);
-            } else {
-                filelist.push(path.relative(dir, path.join(dir, file)));
-            }
-        });
-        return filelist;
     }
 }

@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v9';
 import { PromptTemplate } from 'langchain/prompts';
+import { settings } from '../settings.js';
 import { BotController } from '../utils/bot_controller.js';
 import { ConvMessage } from '../utils/conv_message.js';
 import { Conversation, ConversationEvents } from '../utils/conversation.js';
@@ -18,7 +19,6 @@ import { dateTimeToStr } from '../utils/conversion_utils.js';
 import { BotClient } from './bot_client.js';
 
 export class DiscordClient implements BotClient {
-    settings: any;
     botController: BotController;
 
     private client: Client;
@@ -28,9 +28,8 @@ export class DiscordClient implements BotClient {
     private conversationSequences: Map<Conversation, number | undefined> = new Map();
     private typingTimeout: NodeJS.Timeout | undefined;
 
-    constructor(settings: any) {
-        this.settings = settings;
-        this.botController = new BotController(settings);
+    constructor(botController: BotController) {
+        this.botController = botController;
         this.client = new Client({
             intents: [
                 GatewayIntentBits.Guilds,
@@ -79,7 +78,7 @@ export class DiscordClient implements BotClient {
     private async refreshCommands() {
         const rest = new REST({
             version: '9',
-        }).setToken(this.settings.discord_bot_token);
+        }).setToken(settings.discord_bot_token);
 
         const application = this.client.application;
         if (!application) {
@@ -106,7 +105,7 @@ export class DiscordClient implements BotClient {
         await this.botController.init();
 
         console.log('Logging in...');
-        await this.client.login(this.settings.discord_bot_token);
+        await this.client.login(settings.discord_bot_token);
     }
 
     async shutdown() {
@@ -144,12 +143,12 @@ export class DiscordClient implements BotClient {
 
             // format status prompt
             const statusPromptTemplate = new PromptTemplate({
-                inputVariables: [...Object.keys(this.settings), 'now'],
-                template: this.settings.prompt_templates.status,
+                inputVariables: [...Object.keys(this.botController.settings), 'now'],
+                template: settings.prompt_templates.status,
             });
             const statusPrompt = await statusPromptTemplate.format({
-                ...this.settings,
-                now: dateTimeToStr(new Date(), this.settings.locale),
+                ...this.botController.settings,
+                now: dateTimeToStr(new Date(), settings.locale),
             });
 
             const conversation = new Conversation(this.botController);
@@ -157,7 +156,7 @@ export class DiscordClient implements BotClient {
             const response = await this.botController.botModel.chat(conversation);
             const responseData = this.botController.parseResponse(
                 response,
-                conversation.botController.settings.bot_name
+                conversation.botController.settings.name
             );
             responseData.message = responseData.message.split('.')[0];
             console.log(`Status message: ${responseData.message}`);

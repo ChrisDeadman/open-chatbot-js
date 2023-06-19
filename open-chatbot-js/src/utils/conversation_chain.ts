@@ -8,6 +8,7 @@ type Handlers = { updated: Handler; fromPrev: Handler; toNext: Handler };
 export enum ConversationChainEvents {
     Updated = 'updated',
     Chatting = 'chatting',
+    ChatComplete = 'complete',
 }
 
 export class ConversationChain extends EventEmitter {
@@ -23,56 +24,53 @@ export class ConversationChain extends EventEmitter {
         const sourceConversation = conversations.at(-1);
         const targetConversation = conversations.at(0);
 
-        console.debug(
-            `ConversationChain: addConversation [${conversation.botController.settings.bot_name}]`
-        );
+        console.debug(`ConversationChain: add [${conversation.botController.settings.name}]`);
 
         const handlers: Handlers = {
             updated: this.createUpdatedHandler(conversation),
             fromPrev: () => Promise.resolve(),
             toNext: () => Promise.resolve(),
         };
+        this.handlers.set(conversation, handlers);
+        conversation.on(ConversationEvents.Updated, handlers.updated);
 
         if (sourceConversation && targetConversation) {
-            const sourceHandlers = this.handlers.get(sourceConversation);
-            if (sourceHandlers) {
-                sourceConversation.off(ConversationEvents.UpdatedDelayed, sourceHandlers.toNext);
-            }
-
-            handlers.fromPrev = this.createForwardHandler(sourceConversation, conversation);
-            handlers.toNext = this.createForwardHandler(conversation, targetConversation);
+            this.linkHandlers(sourceConversation, conversation);
+            this.linkHandlers(conversation, targetConversation);
         }
-
-        this.subscribeHandlers(sourceConversation, conversation, handlers);
-        this.handlers.set(conversation, handlers);
     }
 
     removeConversation(conversation: Conversation): void {
         const handlers = this.handlers.get(conversation);
-        if (handlers) {
-            const conversations = this.conversations;
-            const conversationIdx = conversations.indexOf(conversation);
-
-            console.debug(
-                `ConversationChain: removeConversation [${conversation.botController.settings.bot_name}]`
-            );
-
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const source = conversations.at(conversationIdx - 1)!;
-            let target = conversations.at(conversationIdx + 1);
-            if (!target) {
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                target = conversations.at(0)!;
-            }
-
-            this.unsubscribeHandlers(source, conversation, handlers);
-
-            if (source != target) {
-                this.relinkHandlers(source, target);
-            }
-
-            this.handlers.delete(conversation);
+        if (!handlers) {
+            return;
         }
+        const conversations = this.conversations;
+        const conversationIdx = conversations.indexOf(conversation);
+
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        const source = conversations.at(conversationIdx - 1)!;
+        let target = conversations.at(conversationIdx + 1);
+        if (!target) {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            target = conversations.at(0)!;
+        }
+
+        console.debug(
+            `ConversationChain: unlink [${source.botController.settings.name}] => [${conversation.botController.settings.name}]`
+        );
+
+        source.off(ConversationEvents.UpdatedDelayed, handlers.fromPrev);
+        conversation.off(ConversationEvents.UpdatedDelayed, handlers.toNext);
+        conversation.off(ConversationEvents.Updated, handlers.updated);
+
+        if (source != target) {
+            this.linkHandlers(source, target);
+        }
+
+        console.debug(`ConversationChain: remove [${conversation.botController.settings.name}]`);
+
+        this.handlers.delete(conversation);
     }
 
     clear() {
@@ -90,9 +88,12 @@ export class ConversationChain extends EventEmitter {
         // Chat with the bot
         this.emit(ConversationChainEvents.Chatting, conversation);
         this.chatting = conversation.botController.chat(conversation).then(() => conversation);
-        const botname = conversation.botController.settings.bot_name;
+        const botname = conversation.botController.settings.name;
         console.debug(`ConversationChain: [${botname}]: chat`);
-        await this.chatting.then(() => (this.chatting = undefined));
+        await this.chatting.then(c => {
+            this.chatting = undefined;
+            this.emit(ConversationChainEvents.ChatComplete, c);
+        });
     }
 
     async push(message: ConvMessage): Promise<Conversation> {
@@ -109,8 +110,8 @@ export class ConversationChain extends EventEmitter {
 
     private createForwardHandler(source: Conversation, destination: Conversation): Handler {
         return async () => {
-            const srcName = source.botController.settings.bot_name;
-            const dstName = destination.botController.settings.bot_name;
+            const srcName = source.botController.settings.name;
+            const dstName = destination.botController.settings.name;
 
             const sequence = destination.messages.at(-1)?.sequence;
             const newMessages = source
@@ -149,54 +150,27 @@ export class ConversationChain extends EventEmitter {
         return new ConvMessage(role, message.sender, message.content, message.sequence);
     }
 
-    private subscribeHandlers(
-        source: Conversation | undefined,
-        target: Conversation | undefined,
-        handlers: Handlers
-    ): void {
+    private linkHandlers(source: Conversation, target: Conversation): void {
         console.debug(
-            `ConversationChain: subscribeHandlers [${source?.botController.settings.bot_name}] => [${target?.botController.settings.bot_name}]`
-        );
-        source?.on(ConversationEvents.UpdatedDelayed, handlers.fromPrev);
-        target?.on(ConversationEvents.UpdatedDelayed, handlers.toNext);
-        target?.on(ConversationEvents.Updated, handlers.updated);
-    }
-
-    private unsubscribeHandlers(
-        source: Conversation,
-        target: Conversation,
-        handlers: Handlers
-    ): void {
-        console.debug(
-            `ConversationChain: unsubscribeHandlers [${source.botController.settings.bot_name}] => [${target.botController.settings.bot_name}]`
+            `ConversationChain: link [${source.botController.settings.name}] => [${target.botController.settings.name}]`
         );
 
-        source.off(ConversationEvents.UpdatedDelayed, handlers.fromPrev);
-        target.off(ConversationEvents.UpdatedDelayed, handlers.toNext);
-        target.off(ConversationEvents.Updated, handlers.updated);
-    }
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        const sourceHandlers = this.handlers.get(source)!;
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        const targetHandlers = this.handlers.get(target)!;
 
-    private relinkHandlers(source: Conversation, target: Conversation): void {
-        console.debug(
-            `ConversationChain: relinkHandlers [${source.botController.settings.bot_name}] => [${target.botController.settings.bot_name}]`
-        );
-
-        // create and link new handler
+        // create new handler
         const handler = this.createForwardHandler(source, target);
+
+        // unlink old handler
+        source.off(ConversationEvents.UpdatedDelayed, sourceHandlers.toNext);
+
+        // link new handler
         source.on(ConversationEvents.UpdatedDelayed, handler);
 
         // update handler mapping
-        this.handlers.set(source, {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            ...this.handlers.get(source)!,
-            toNext: handler,
-        });
-
-        // update handler mapping
-        this.handlers.set(target, {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            ...this.handlers.get(target)!,
-            fromPrev: handler,
-        });
+        sourceHandlers.toNext = handler;
+        targetHandlers.fromPrev = handler;
     }
 }

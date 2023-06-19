@@ -1,0 +1,8 @@
+{
+  "user": "",
+  "bot": "### Response:",
+  "bot_message": "{name}:",
+  "turn_template": "{user_message}\n\n{bot}{bot_message}\n\n</s>",
+  "prefix": "",
+  "command": "\nContinue the dialogue below as \"{name}\".\n"
+}

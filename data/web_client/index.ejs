@@ -29,173 +29,275 @@
             aria-labelledby="settingsModalLabel"
             aria-hidden="true"
           >
-            <div class="modal-dialog" role="document">
+            <div class="modal-dialog modal-dialog-large" role="document">
               <div class="modal-content">
                 <div class="modal-header">
                   <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
                 </div>
                 <form id="settingsForm" class="modal-body">
-                  <div class="form-group">
-                    <label for="username" class="py-2">User Name:</label>
-                    <input
-                      type="text"
-                      id="username"
-                      class="form-control py-2"
-                      value="<%= username %>"
-                    />
-                  </div>
-                  <div class="form-group">
-                    <label for="bot_name" class="py-2">Bot Name:</label>
-                    <input
-                      type="text"
-                      id="bot_name"
-                      class="form-control py-2"
-                      value="<%= settings.bot_name %>"
-                    />
-                  </div>
-                  <div class="form-group">
-                    <label for="language" class="py-2">Language:</label>
-                    <input
-                      type="text"
-                      id="language"
-                      class="form-control py-2"
-                      value="<%= settings.language %>"
-                    />
-                  </div>
-                  <div class="flex flex-column border rounded p-3 my-3">
-                    <div class="form-group">
-                      <label for="bot_backend.rate_limit_ms" class="py-2">rate_limit_ms:</label>
-                      <input
-                        type="number"
-                        id="bot_backend.rate_limit_ms"
-                        class="form-control py-2"
-                        value="<%= settings.bot_backend.rate_limit_ms %>"
-                      />
-                    </div>
-                    <div class="form-group d-flex align-items-center">
-                      <label for="bot_backend.temperature" class="py-2">temperature:</label>
-                      <input
-                        type="range"
-                        class="form-control-range flex-grow-1 m-2"
-                        id="bot_backend.temperature"
-                        min="0.01"
-                        max="1.99"
-                        step="0.01"
-                        value="<%= settings.bot_backend.temperature %>"
-                        data-display="bot_backend.temperature_display"
-                      />
-                      <input
-                        type="text"
-                        readonly
-                        class="form-control py-2"
-                        style="width: 60px"
-                        id="bot_backend.temperature_display"
-                        value="<%= settings.bot_backend.temperature %>"
-                      />
-                    </div>
-                    <div class="form-group d-flex align-items-center">
-                      <label for="bot_backend.top_p" class="py-2">top_p:</label>
-                      <input
-                        type="range"
-                        class="form-control-range flex-grow-1 m-2"
-                        id="bot_backend.top_p"
-                        min="0.0"
-                        max="1.0"
-                        step="0.01"
-                        value="<%= settings.bot_backend.top_p %>"
-                        data-display="bot_backend.top_p_display"
-                      />
-                      <input
-                        type="text"
-                        readonly
-                        class="form-control py-2"
-                        style="width: 60px"
-                        id="bot_backend.top_p_display"
-                        value="<%= settings.bot_backend.top_p %>"
-                      />
-                    </div>
-                    <div class="form-group d-flex align-items-center">
-                      <label for="bot_backend.top_k" class="py-2">top_k:</label>
-                      <input
-                        type="range"
-                        class="form-control-range flex-grow-1 m-2"
-                        id="bot_backend.top_k"
-                        min="0"
-                        max="200"
-                        step="1"
-                        value="<%= settings.bot_backend.top_k %>"
-                        data-display="bot_backend.top_k_display"
-                      />
-                      <input
-                        type="text"
-                        readonly
-                        class="form-control py-2"
-                        style="width: 60px"
-                        id="bot_backend.top_k_display"
-                        value="<%= settings.bot_backend.top_k %>"
-                      />
-                    </div>
-                    <div class="form-group d-flex align-items-center">
-                      <label for="bot_backend.typical_p" class="py-2">typical_p:</label>
-                      <input
-                        type="range"
-                        class="form-control-range flex-grow-1 m-2"
-                        id="bot_backend.typical_p"
-                        min="0.0"
-                        max="1.0"
-                        step="0.01"
-                        value="<%= settings.bot_backend.typical_p %>"
-                        data-display="bot_backend.typical_p_display"
-                      />
-                      <input
-                        type="text"
-                        readonly
-                        class="form-control py-2"
-                        style="width: 60px"
-                        id="bot_backend.typical_p_display"
-                        value="<%= settings.bot_backend.typical_p %>"
-                      />
-                    </div>
-                    <div class="form-group d-flex align-items-center">
-                      <label for="bot_backend.repetition_penalty" class="py-2"
-                        >repetition_penalty:</label
+                  <div class="accordion">
+                    <div class="accordion-item">
+                      <div class="accordion-header" id="headingBackend">
+                        <button
+                          class="accordion-button"
+                          type="button"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#collapseBackend"
+                          aria-expanded="true"
+                          aria-controls="collapseBackend"
+                        >
+                          Backend
+                        </button>
+                      </div>
+                      <div
+                        id="collapseBackend"
+                        class="accordion-collapse collapse"
+                        aria-labelledby="headingBackend"
+                        data-bs-parent=".accordion"
                       >
-                      <input
-                        type="range"
-                        class="form-control-range flex-grow-1 m-2"
-                        id="bot_backend.repetition_penalty"
-                        min="0.0"
-                        max="1.5"
-                        step="0.01"
-                        value="<%= settings.bot_backend.repetition_penalty %>"
-                        data-display="bot_backend.repetition_penalty_display"
-                      />
-                      <input
-                        type="text"
-                        readonly
-                        class="form-control py-2"
-                        style="width: 60px"
-                        id="bot_backend.repetition_penalty_display"
-                        value="<%= settings.bot_backend.repetition_penalty %>"
-                      />
+                        <div class="accordion-body">
+                          <div class="form-group">
+                            <label for="bot_backend.name" class="py-2">Bot backend:</label>
+                            <input
+                              type="text"
+                              id="bot_backend.name"
+                              class="form-control py-2"
+                              disabled
+                            />
+                          </div>
+                          <div class="form-group">
+                            <label for="embedding_backend.name" class="py-2"
+                              >Embedding backend:</label
+                            >
+                            <input
+                              type="text"
+                              id="embedding_backend.name"
+                              class="form-control py-2"
+                              disabled
+                            />
+                          </div>
+                          <div class="form-group">
+                            <label for="memory_backend.name" class="py-2">Memory backend:</label>
+                            <input
+                              type="text"
+                              id="memory_backend.name"
+                              class="form-control py-2"
+                              disabled
+                            />
+                          </div>
+                          <div class="form-group">
+                            <label for="bot_backend.rate_limit_ms" class="py-2"
+                              >rate_limit_ms:</label
+                            >
+                            <input
+                              type="number"
+                              id="bot_backend.rate_limit_ms"
+                              class="form-control py-2"
+                            />
+                          </div>
+                          <div class="form-group d-flex align-items-center">
+                            <label for="bot_backend.temperature" class="py-2">temperature:</label>
+                            <input
+                              type="range"
+                              class="form-control-range flex-grow-1 m-2"
+                              id="bot_backend.temperature"
+                              min="0.01"
+                              max="1.99"
+                              step="0.01"
+                              data-display="bot_backend.temperature_display"
+                            />
+                            <input
+                              type="text"
+                              readonly
+                              class="form-control py-2"
+                              style="width: 60px"
+                              id="bot_backend.temperature_display"
+                            />
+                          </div>
+                          <div class="form-group d-flex align-items-center">
+                            <label for="bot_backend.top_p" class="py-2">top_p:</label>
+                            <input
+                              type="range"
+                              class="form-control-range flex-grow-1 m-2"
+                              id="bot_backend.top_p"
+                              min="0.0"
+                              max="1.0"
+                              step="0.01"
+                              data-display="bot_backend.top_p_display"
+                            />
+                            <input
+                              type="text"
+                              readonly
+                              class="form-control py-2"
+                              style="width: 60px"
+                              id="bot_backend.top_p_display"
+                            />
+                          </div>
+                          <div class="form-group d-flex align-items-center">
+                            <label for="bot_backend.top_k" class="py-2">top_k:</label>
+                            <input
+                              type="range"
+                              class="form-control-range flex-grow-1 m-2"
+                              id="bot_backend.top_k"
+                              min="0"
+                              max="200"
+                              step="1"
+                              data-display="bot_backend.top_k_display"
+                            />
+                            <input
+                              type="text"
+                              readonly
+                              class="form-control py-2"
+                              style="width: 60px"
+                              id="bot_backend.top_k_display"
+                            />
+                          </div>
+                          <div class="form-group d-flex align-items-center">
+                            <label for="bot_backend.typical_p" class="py-2">typical_p:</label>
+                            <input
+                              type="range"
+                              class="form-control-range flex-grow-1 m-2"
+                              id="bot_backend.typical_p"
+                              min="0.0"
+                              max="1.0"
+                              step="0.01"
+                              data-display="bot_backend.typical_p_display"
+                            />
+                            <input
+                              type="text"
+                              readonly
+                              class="form-control py-2"
+                              style="width: 60px"
+                              id="bot_backend.typical_p_display"
+                            />
+                          </div>
+                          <div class="form-group d-flex align-items-center">
+                            <label for="bot_backend.repetition_penalty" class="py-2"
+                              >repetition_penalty:</label
+                            >
+                            <input
+                              type="range"
+                              class="form-control-range flex-grow-1 m-2"
+                              id="bot_backend.repetition_penalty"
+                              min="0.0"
+                              max="1.5"
+                              step="0.01"
+                              data-display="bot_backend.repetition_penalty_display"
+                            />
+                            <input
+                              type="text"
+                              readonly
+                              class="form-control py-2"
+                              style="width: 60px"
+                              id="bot_backend.repetition_penalty_display"
+                            />
+                          </div>
+                          <div class="form-group">
+                            <label for="bot_backend.max_new_tokens" class="py-2"
+                              >max_new_tokens:</label
+                            >
+                            <input
+                              type="number"
+                              id="bot_backend.max_new_tokens"
+                              class="form-control py-2"
+                            />
+                          </div>
+                          <div class="form-group">
+                            <label for="bot_backend.token_limit" class="py-2">token_limit:</label>
+                            <input
+                              type="number"
+                              id="bot_backend.token_limit"
+                              class="form-control py-2"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div class="form-group">
-                      <label for="bot_backend.max_new_tokens" class="py-2">max_new_tokens:</label>
-                      <input
-                        type="number"
-                        id="bot_backend.max_new_tokens"
-                        class="form-control py-2"
-                        value="<%= settings.bot_backend.max_new_tokens %>"
-                      />
+                    <div class="accordion-item">
+                      <div class="accordion-header" id="headingTurnTemplate">
+                        <button
+                          class="accordion-button"
+                          type="button"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#collapseTurnTemplate"
+                          aria-expanded="true"
+                          aria-controls="collapseTurnTemplate"
+                        >
+                          Turn Template
+                        </button>
+                      </div>
+                      <div
+                        id="collapseTurnTemplate"
+                        class="accordion-collapse collapse"
+                        aria-labelledby="headingTurnTemplate"
+                        data-bs-parent=".accordion"
+                      >
+                        <div class="accordion-body">
+                          <div class="form-group">
+                            <label for="user" class="py-2">User:</label>
+                            <input type="text" id="user" class="form-control py-2" />
+                          </div>
+                          <div class="form-group">
+                            <label for="bot" class="py-2">Bot:</label>
+                            <input type="text" id="bot" class="form-control py-2" />
+                          </div>
+                          <div class="form-group">
+                            <label for="bot_message" class="py-2">Bot Message:</label>
+                            <input type="text" id="bot_message" class="form-control py-2" />
+                          </div>
+                          <div class="form-group">
+                            <label for="turn_template" class="py-2">Turn Template:</label>
+                            <input type="text" id="turn_template" class="form-control py-2" />
+                          </div>
+                          <div class="form-group">
+                            <label for="prefix" class="py-2">Prefix:</label>
+                            <input type="text" id="prefix" class="form-control py-2" />
+                          </div>
+                          <div class="form-group">
+                            <label for="command" class="py-2">Command:</label>
+                            <input type="text" id="command" class="form-control py-2" />
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div class="form-group">
-                      <label for="bot_backend.token_limit" class="py-2">token_limit:</label>
-                      <input
-                        type="number"
-                        id="bot_backend.token_limit"
-                        class="form-control py-2"
-                        value="<%= settings.bot_backend.token_limit %>"
-                      />
+                    <div class="accordion-item">
+                      <div class="accordion-header" id="headingCharacter">
+                        <button
+                          class="accordion-button"
+                          type="button"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#collapseCharacter"
+                          aria-expanded="true"
+                          aria-controls="collapseCharacter"
+                        >
+                          Character
+                        </button>
+                      </div>
+                      <div
+                        id="collapseCharacter"
+                        class="accordion-collapse collapse show"
+                        aria-labelledby="headingCharacter"
+                        data-bs-parent=".accordion"
+                      >
+                        <div class="accordion-body">
+                          <div class="form-group">
+                            <label for="name" class="py-2">Name:</label>
+                            <input type="text" id="name" class="form-control py-2" />
+                          </div>
+                          <div class="form-group">
+                            <label for="language" class="py-2">Language:</label>
+                            <input type="text" id="language" class="form-control py-2" />
+                          </div>
+                          <div class="form-group">
+                            <label for="context" class="py-2">Context:</label>
+                            <textarea id="context" class="form-control py-2" rows="15"></textarea>
+                          </div>
+                          <div class="form-group">
+                            <label for="history" class="py-2">History:</label>
+                            <textarea id="history" class="form-control py-2" rows="7"></textarea>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div class="modal-footer">
@@ -207,81 +309,72 @@
               </div>
             </div>
           </div>
-          <!-- Prompt Modal -->
+          <!-- Add Bot Modal -->
           <div
             class="modal fade"
-            id="promptModal"
+            id="addBotModal"
             tabindex="-1"
             role="dialog"
-            aria-labelledby="promptModalLabel"
+            aria-labelledby="addBotModalLabel"
             aria-hidden="true"
           >
             <div class="modal-dialog" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title" id="promptModalLabel">Prompt Templates</h5>
+                  <h5 class="modal-title" id="addBotModalLabel">Add Bot</h5>
                 </div>
-                <form id="promptForm" class="modal-body">
-                  <div class="form-group">
-                    <label for="prompt_templates.system_message" class="py-2"
-                      >System Message:</label
+                <form id="addBotForm" class="modal-body">
+                  <div class="dropdown mb-3">
+                    <button
+                      class="btn btn-secondary dropdown-toggle"
+                      type="button"
+                      id="backendDropdownButton"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
                     >
-                    <input
-                      type="text"
-                      id="prompt_templates.system_message"
-                      class="form-control py-2"
-                      value="<%= settings.prompt_templates.system_message %>"
-                    />
+                      Backend
+                    </button>
+                    <ul
+                      class="dropdown-menu"
+                      aria-labelledby="backendDropdownButton"
+                      id="backendDropdown"
+                    ></ul>
                   </div>
-                  <div class="form-group">
-                    <label for="prompt_templates.user_message" class="py-2">User Message:</label>
-                    <input
-                      type="text"
-                      id="prompt_templates.user_message"
-                      class="form-control py-2"
-                      value="<%= settings.prompt_templates.user_message %>"
-                    />
+                  <div class="dropdown mb-3">
+                    <button
+                      class="btn btn-secondary dropdown-toggle"
+                      type="button"
+                      id="turnTemplateDropdownButton"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                    >
+                      Turn Template
+                    </button>
+                    <ul
+                      class="dropdown-menu"
+                      aria-labelledby="turnTemplateDropdownButton"
+                      id="turnTemplateDropdown"
+                    ></ul>
                   </div>
-                  <div class="form-group">
-                    <label for="prompt_templates.assistant_message" class="py-2"
-                      >Assistant Message:</label
+                  <div class="dropdown mb-3">
+                    <button
+                      class="btn btn-secondary dropdown-toggle"
+                      type="button"
+                      id="characterDropdownButton"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
                     >
-                    <input
-                      type="text"
-                      id="prompt_templates.assistant_message"
-                      class="form-control py-2"
-                      value="<%= settings.prompt_templates.assistant_message %>"
-                    />
-                  </div>
-                  <div class="form-group">
-                    <label for="prompt_templates.suffix" class="py-2">Suffix:</label>
-                    <textarea id="prompt_templates.suffix" class="form-control py-2" rows="1">
-<%= settings.prompt_templates.suffix.join("\n") %></textarea
-                    >
-                  </div>
-                  <div class="form-group">
-                    <label for="prompt_templates.prefix" class="py-2">Prefix:</label>
-                    <textarea id="prompt_templates.prefix" class="form-control py-2" rows="15">
-<%= settings.prompt_templates.prefix.join('\n') %></textarea
-                    >
-                  </div>
-                  <div class="form-group">
-                    <label for="prompt_templates.history" class="py-2">History:</label>
-                    <textarea id="prompt_templates.history" class="form-control py-2" rows="15">
-<%= settings.prompt_templates.history.join('\n') %></textarea
-                    >
-                  </div>
-                  <div class="form-group">
-                    <label for="prompt_templates.bot_browser" class="py-2"
-                      >Bot-Browser Prompt:</label
-                    >
-                    <textarea id="prompt_templates.bot_browser" class="form-control py-2" rows="10">
-<%= settings.prompt_templates.bot_browser.join('\n') %></textarea
-                    >
+                      Character
+                    </button>
+                    <ul
+                      class="dropdown-menu"
+                      aria-labelledby="characterDropdownButton"
+                      id="characterDropdown"
+                    ></ul>
                   </div>
                   <div class="modal-footer">
                     <button type="submit" class="btn btn-primary" data-bs-dismiss="modal">
-                      Close
+                      Add
                     </button>
                   </div>
                 </form>
@@ -289,30 +382,6 @@
             </div>
           </div>
           <div class="d-flex flex-column">
-            <div class="d-flex flex-row align-items-center justify-content-end">
-              <!-- Prompt button -->
-              <div class="input-group-append">
-                <button
-                  type="button"
-                  class="btn btn-warning"
-                  data-bs-toggle="modal"
-                  data-bs-target="#promptModal"
-                >
-                  Prompt
-                </button>
-              </div>
-              <!-- Settings button -->
-              <div class="input-group-prepend">
-                <button
-                  type="button"
-                  class="btn btn-secondary ms-2"
-                  data-bs-toggle="modal"
-                  data-bs-target="#settingsModal"
-                >
-                  <i class="fas fa-cog"></i>
-                </button>
-              </div>
-            </div>
             <!-- App Title -->
             <h1 class="text-center flex-grow-1 my-3">🤖 open-chatbot-js 🤖</h1>
             <!-- Nav bar -->
@@ -321,27 +390,11 @@
             >
               <!-- Bot list -->
               <div class="container-fluid d-flex flex-row">
-                <div id="botList" class="d-flex flex-row flex-grow-1 justify-content-end">
-                  <div class="input-group-append me-2">
-                    <ul class="navbar-nav">
-                      <li class="nav-item dropdown position-static">
-                        <a
-                          class="nav-link dropdown-toggle"
-                          href="#"
-                          id="addBotDropdownMenuLink"
-                          role="button"
-                          data-bs-toggle="dropdown"
-                          aria-haspopup="true"
-                        >
-                          <i class="fa-solid fa-plus"></i> add bot
-                        </a>
-                        <ul
-                          id="addBotDropdown"
-                          class="dropdown-menu dropdown-menu-dark position-absolute w-100"
-                          aria-labelledby="addBotDropdownMenuLink"
-                        ></ul>
-                      </li>
-                    </ul>
+                <div id="botList" class="navbar-nav d-flex flex-row flex-grow-1 align-items-center justify-content-end">
+                  <div class="nav-item">
+                    <button id="addBotButton" type="button" class="btn">
+                      <i class="fa-solid fa-plus"></i> bot
+                    </button>
                   </div>
                 </div>
               </div>
@@ -357,14 +410,25 @@
           <form id="messageForm" class="input-group">
             <div class="d-flex flex-column flex-grow-1">
               <!-- Message Input -->
-              <div id="userInput" class="textarea form-control flex-grow-1" contenteditable></div>
-              <div class="d-flex flex-row flex-grow-1 align-items-end justify-content-between my-2">
-                <!-- Reset button -->
-                <div class="input-group-append">
-                  <button id="resetButton" type="button" class="btn btn-danger">
-                    Reset Conversation
-                  </button>
+              <div class="d-flex flex-row">
+                <div class="col-xs-3 pe-2">
+                  <input
+                    id="usernameInput"
+                    type="text"
+                    class="input-group-addon form-control"
+                    style="max-width: 200px"
+                    value="<%= username %>"
+                  />
+                  <!-- Reset button -->
+                  <div class="input-group-append">
+                    <button id="resetButton" type="button" class="btn btn-danger text-nowrap mt-2">
+                      Reset Conversation
+                    </button>
+                  </div>
                 </div>
+                <div id="userInput" class="textarea form-control flex-grow-1" contenteditable></div>
+              </div>
+              <div class="d-flex flex-row flex-grow-1 align-items-end justify-content-end my-2">
                 <!-- Send button -->
                 <div class="input-group-append">
                   <button type="submit" class="btn btn-primary">Send</button>

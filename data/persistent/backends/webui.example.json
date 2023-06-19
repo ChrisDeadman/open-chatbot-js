@@ -1,0 +1,23 @@
+{
+  "bot_backend": {
+    "name": "webui",
+    "model": "http://127.0.0.1:5000/api/v1",
+    "temperature": 0.66,
+    "top_p": 0.95,
+    "top_k": 0,
+    "typical_p": 1.0,
+    "repetition_penalty": 1.18,
+    "max_new_tokens": 512,
+    "token_limit": 2000,
+    "rate_limit_ms": 0
+  },
+  "embedding_backend": {
+    "name": "sbert",
+    "model": "sentence-transformers/paraphrase-albert-small-v2"
+  },
+  "memory_backend": {
+    "name": "redis",
+    "redis_host": "localhost",
+    "redis_port": 6379
+  }
+}

@@ -5,23 +5,25 @@
       "name": "start:terminal",
       "type": "node",
       "request": "launch",
-      "protocol": "inspector",
       "preLaunchTask": "build",
       "cwd": "${workspaceFolder}",
       "runtimeExecutable": "node",
       "args": [
         "--enable-source-maps",
         "${workspaceFolder}/open-chatbot-js/dist/src/index.js",
-        "terminal"
+        "terminal",
+        "-b",
+        "webui.example.json",
+        "-t",
+        "alpaca.json",
+        "-c",
+        "eva.example.json"
       ],
       "env": {
         "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
         "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/google-chrome-stable"
       },
-      "resolveSourceMapLocations": [
-        "${workspaceFolder}/**",
-        "!**/node_modules/**"
-      ],
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
       "outputCapture": "std",
       "console": "integratedTerminal",
       "internalConsoleOptions": "openOnSessionStart",
@@ -36,7 +38,6 @@
       "name": "start:web",
       "type": "node",
       "request": "launch",
-      "protocol": "inspector",
       "preLaunchTask": "build",
       "cwd": "${workspaceFolder}",
       "runtimeExecutable": "node",
@@ -49,10 +50,7 @@
         "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
         "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/google-chrome-stable"
       },
-      "resolveSourceMapLocations": [
-        "${workspaceFolder}/**",
-        "!**/node_modules/**"
-      ],
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
       "outputCapture": "std",
       "internalConsoleOptions": "openOnSessionStart",
       "skipFiles": ["<node_internals>/**"],
@@ -66,23 +64,25 @@
       "name": "start:sttts",
       "type": "node",
       "request": "launch",
-      "protocol": "inspector",
       "preLaunchTask": "build",
       "cwd": "${workspaceFolder}",
       "runtimeExecutable": "node",
       "args": [
         "--enable-source-maps",
         "${workspaceFolder}/open-chatbot-js/dist/src/index.js",
-        "sttts"
+        "sttts",
+        "-b",
+        "webui.example.json",
+        "-t",
+        "alpaca.json",
+        "-c",
+        "eva.example.json"
       ],
       "env": {
         "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
         "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/google-chrome-stable"
       },
-      "resolveSourceMapLocations": [
-        "${workspaceFolder}/**",
-        "!**/node_modules/**"
-      ],
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
       "outputCapture": "std",
       "internalConsoleOptions": "openOnSessionStart",
       "skipFiles": ["<node_internals>/**"],
@@ -96,23 +96,25 @@
       "name": "start:discord",
       "type": "node",
       "request": "launch",
-      "protocol": "inspector",
       "preLaunchTask": "build",
       "cwd": "${workspaceFolder}",
       "runtimeExecutable": "node",
       "args": [
         "--enable-source-maps",
         "${workspaceFolder}/open-chatbot-js/dist/src/index.js",
-        "discord"
+        "discord",
+        "-b",
+        "webui.example.json",
+        "-t",
+        "alpaca.json",
+        "-c",
+        "eva.example.json"
       ],
       "env": {
         "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
         "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/google-chrome-stable"
       },
-      "resolveSourceMapLocations": [
-        "${workspaceFolder}/**",
-        "!**/node_modules/**"
-      ],
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
       "outputCapture": "std",
       "internalConsoleOptions": "openOnSessionStart",
       "skipFiles": ["<node_internals>/**"],

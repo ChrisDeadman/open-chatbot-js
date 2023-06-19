@@ -52,13 +52,15 @@ Copy an example configuration from `data/persistent/settings.example.*.json` to 
 docker build -t deads-inc/open-chatbot-js .
 ```
 
-_`<mode>` is one of the implemented clients, e.g. `terminal`_
+- `<mode>` is one of the implemented clients, e.g. `terminal`
+- `-d` selects `data/persistent` as data directory
+- `-b` selects one of the backends under `data/persistent/backends`
+- `-t` selects one of the turn templates under `data/persistent/turn_templates`
+- `-c` selects one of the characters under `data/persistent/characters`
 
 ```
-docker run -it --rm --net=host -v ./data/persistent/:/app/data/persistent/ deads-inc/open-chatbot-js <mode> -s data/persistent/settings.json
+docker run -it --rm --net=host -v ./data/persistent/:/app/data/persistent/ deads-inc/open-chatbot-js <mode> -d data/persistent -b webui.example.json -t vicuna.json -c eva.example.json
 ```
-
-_ensure to load the correct settings file_
 
 ## 🏗️ Build locally
 
